@@ -3,27 +3,30 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Brick Price Check</title>
+<title>DrSeussFreak&#39;s Brick Checker</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Figtree:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
 <style>
-/* Layout: set details on top; price sources (left) feed a sticky shelf-tag card (right) that applies the CBS consignment rules; stacks on phones */
+/* Layout: set details on top; price sources (left) feed a sticky shelf-tag card (right) that applies the consignment rules; stacks on phones */
 :root{
-  --bg:#eef1f5; --surface:#ffffff; --sunk:#e3e8ef; --line:#cfd6e0;
+  --bg:#f1f5ee; --surface:#ffffff; --sunk:#e6ece2; --line:#cdd8c6;
   --fg:#18202c; --muted:#5b6678;
-  --accent:#f2b705; --accent-ink:#2a2100; --link:#1f5fbf;
+  --accent:#7cc46a; --accent-ink:#0f2a0a; --link:#2f6fb8;
+  --pink:#ef8db3; --brown:#8a5a2b; --yellow:#f5d33a;
   --good:#1d7a46; --warn:#a35c00; --bad:#b3261e;
   --display:"Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
   --body:"Figtree", "Segoe UI", system-ui, sans-serif;
   --mono:"JetBrains Mono", ui-monospace, Menlo, monospace;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --bg:#11161e; --surface:#19202b; --sunk:#0d1218; --line:#2c3644;
-  --fg:#e7ebf1; --muted:#97a2b4; --accent:#f5c32c; --accent-ink:#231b00; --link:#7fb0ff;
+  --bg:#121712; --surface:#1a211a; --sunk:#0e130e; --line:#2e3a2d;
+  --fg:#e7ebf1; --muted:#97a2b4; --accent:#8fd47c; --accent-ink:#0f2a0a; --link:#7fb0ff;
+  --pink:#f4a0c1; --brown:#b07a45; --yellow:#f5d33a;
   --good:#5cc98a; --warn:#f0a648; --bad:#ff8a80; color-scheme:dark }}
 :root[data-theme="dark"]{
-  --bg:#11161e; --surface:#19202b; --sunk:#0d1218; --line:#2c3644;
-  --fg:#e7ebf1; --muted:#97a2b4; --accent:#f5c32c; --accent-ink:#231b00; --link:#7fb0ff;
+  --bg:#121712; --surface:#1a211a; --sunk:#0e130e; --line:#2e3a2d;
+  --fg:#e7ebf1; --muted:#97a2b4; --accent:#8fd47c; --accent-ink:#0f2a0a; --link:#7fb0ff;
+  --pink:#f4a0c1; --brown:#b07a45; --yellow:#f5d33a;
   --good:#5cc98a; --warn:#f0a648; --bad:#ff8a80; color-scheme:dark }
 
 *{box-sizing:border-box}
@@ -45,6 +48,9 @@ header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-be
 header p{margin:6px 0 0;color:var(--muted);max-width:62ch}
 .studs{display:inline-flex;gap:5px;margin-right:10px;vertical-align:middle}
 .studs i{width:12px;height:12px;border-radius:50%;background:var(--accent);box-shadow:inset 0 -2px 0 rgba(0,0,0,.18)}
+.studs i:nth-child(2){background:var(--pink)} .studs i:nth-child(3){background:var(--yellow)} .studs i:nth-child(4){background:var(--brown)}
+.brand{display:flex;align-items:center;gap:14px}
+.logo{width:76px;height:76px;object-fit:contain;flex:none}
 .example{display:inline-block;font-size:12px;font-weight:600;color:var(--accent-ink);background:var(--accent);padding:3px 9px;border-radius:99px}
 
 .lookup{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;
@@ -166,10 +172,13 @@ td input{width:110px;padding:7px 8px}
 
 <div class="wrap">
   <header>
+    <div class="brand">
+    <img class="logo" src="logo.png" alt="" onerror="this.remove()">
     <div>
-      <div class="eyebrow">Central Brick Society · consignment pricing</div>
-      <h1><span class="studs" aria-hidden="true"><i></i><i></i><i></i><i></i></span>Brick Price Check</h1>
-      <p>Prices a set the same way as the Pricing tab in your Consignment Tracker: average of four sites, never below retail, shelf price from the LR Suggested Price rounded to $5, then any condition discount.</p>
+      <div class="eyebrow">DrSeussFreak · LEGO pricing</div>
+      <h1><span class="studs" aria-hidden="true"><i></i><i></i><i></i><i></i></span>DrSeussFreak&#39;s Brick Checker</h1>
+      <p>Prices a set the same way as the Pricing tab in your tracker: average of four sites, never below retail, shelf price from the LR Suggested Price rounded to $5, then any condition discount.</p>
+    </div>
     </div>
     <span class="example" id="exampleBadge">Example: 42127 from your tracker</span>
   </header>
@@ -211,7 +220,7 @@ td input{width:110px;padding:7px 8px}
   <details class="panel conn" id="connPanel">
     <summary><b>Live data connection</b> <span class="hint" id="connSummary">Not connected. Prices are typed in by hand.</span></summary>
     <div class="connbody">
-      <p class="hint">Live lookups use the CBS Pricing API in your Consignment Tracker (Google Apps Script), which holds your BrickLink, Brickset, BrickEconomy and Rebrickable keys. Paste its web app URL here. Saved in this browser only.</p>
+      <p class="hint">Live lookups use the Pricing API in your tracker (Google Apps Script), which holds your BrickLink, Brickset, BrickEconomy and Rebrickable keys. Paste its web app URL here. Saved in this browser only.</p>
       <div style="display:grid;grid-template-columns:minmax(0,3fr) minmax(0,1fr) auto;gap:10px;align-items:end">
         <label>Web app URL<input id="apiUrl" placeholder="https://script.google.com/macros/s/…/exec"></label>
         <label>Token (if set)<input id="apiToken" type="password" placeholder="optional"></label>
@@ -319,16 +328,16 @@ td input{width:110px;padding:7px 8px}
       </div>
 
       <div>
-        <div class="eyebrow" style="margin-bottom:6px">Consignment split · CBS keeps <input id="rate" class="num" type="number" min="0" max="100" step="0.5" value="35" style="width:62px;padding:3px 6px;display:inline-block" aria-label="CBS consignment rate percent">%</div>
+        <div class="eyebrow" style="margin-bottom:6px">Consignment split · store keeps <input id="rate" class="num" type="number" min="0" max="100" step="0.5" value="35" style="width:62px;padding:3px 6px;display:inline-block" aria-label="Store consignment rate percent">%</div>
         <div class="split">
           <div><span>Sale price</span><b id="spSale">–</b></div>
           <div><span>Consignor</span><b id="spCons">–</b></div>
-          <div><span>CBS</span><b id="spCbs">–</b></div>
+          <div><span>Store</span><b id="spCbs">–</b></div>
         </div>
         <div class="split" style="margin-top:8px">
           <div><span>With 5% member/employee</span><b id="mdSale">–</b></div>
           <div><span>Consignor</span><b id="mdCons">–</b></div>
-          <div><span>CBS</span><b id="mdCbs">–</b></div>
+          <div><span>Store</span><b id="mdCbs">–</b></div>
         </div>
       </div>
 
@@ -547,7 +556,7 @@ function calc(){
   summary = normal==null ? "" :
     `${label}: set price ${money(finalPx,false)}` + (pct>0?` (${pct}% off ${money(normal,false)}, ${reason||"no reason given"})`:"") + `\n` +
     `Avg market value ${money(avg)} · floor ${floor?money(floor):"none"} · recommended ${money(rec,false)} · LR ${lr!=null?money(lr):"none"}\n` +
-    `Consignor ${money(R.split.consignor)} / CBS ${money(R.split.cbs)} at ${Math.round(R.consignmentRate*1000)/10}%` +
+    `Consignor ${money(R.split.consignor)} / store ${money(R.split.cbs)} at ${Math.round(R.consignmentRate*1000)/10}%` +
     (usedPx!=null ? `\nUsed price ${money(usedPx,false)}` : "");
   store.set("bpc.rate", $("rate").value);
 }
