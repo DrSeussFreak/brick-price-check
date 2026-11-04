@@ -229,7 +229,8 @@ function doGet(e) {
   var out;
   try {
     var need = PropertiesService.getScriptProperties().getProperty("API_TOKEN");
-    if (need && q.token !== need && !q.rules) throw new Error("Wrong or missing token");
+    if (!need && !q.rules) throw new Error("Set API_TOKEN in Script properties first; the web app refuses requests until it has one");
+    if (q.token !== need && !q.rules) throw new Error("Wrong or missing token");
     var live = lookupRoute_(q) || syncRoute_(q);
     if (live) out = live;
     else if (q.rules) out = BrickPricing.RULES;
@@ -295,7 +296,7 @@ function priceFromSheet_(setNum) {
  *                              bricklink.com > My BrickLink > API (needs a BrickLink account; register IP 0.0.0.0
  *                              for the token so Google's servers can use it)
  *   BRICKECONOMY_API_KEY       BrickEconomy Premium > API
- *   API_TOKEN                  optional: if set, every request must include &token=<same value>
+ *   API_TOKEN                  required: every request must include &token=<same value>
  * Any source without a key is skipped and reported as "no key".
  *
  * Requests (add &token=... if API_TOKEN is set):
@@ -756,7 +757,8 @@ function doPost(e) {
   try {
     var body = JSON.parse(e.postData && e.postData.contents || "{}");
     var need = prop_("API_TOKEN");
-    if (need && body.token !== need) throw new Error("Wrong or missing token");
+    if (!need) throw new Error("Set API_TOKEN in Script properties first");
+    if (body.token !== need) throw new Error("Wrong or missing token");
     if (body.action === "apply") out = syncApply_(!!body.removeExtras);
     else throw new Error("Unknown action");
   } catch (err) { out = { error: String(err && err.message || err) }; }
