@@ -1,0 +1,982 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Brick Price Check</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Figtree:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: set details on top; price sources (left) feed a sticky shelf-tag card (right) that applies the CBS consignment rules; stacks on phones */
+:root{
+  --bg:#eef1f5; --surface:#ffffff; --sunk:#e3e8ef; --line:#cfd6e0;
+  --fg:#18202c; --muted:#5b6678;
+  --accent:#f2b705; --accent-ink:#2a2100; --link:#1f5fbf;
+  --good:#1d7a46; --warn:#a35c00; --bad:#b3261e;
+  --display:"Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
+  --body:"Figtree", "Segoe UI", system-ui, sans-serif;
+  --mono:"JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#11161e; --surface:#19202b; --sunk:#0d1218; --line:#2c3644;
+  --fg:#e7ebf1; --muted:#97a2b4; --accent:#f5c32c; --accent-ink:#231b00; --link:#7fb0ff;
+  --good:#5cc98a; --warn:#f0a648; --bad:#ff8a80; color-scheme:dark }}
+:root[data-theme="dark"]{
+  --bg:#11161e; --surface:#19202b; --sunk:#0d1218; --line:#2c3644;
+  --fg:#e7ebf1; --muted:#97a2b4; --accent:#f5c32c; --accent-ink:#231b00; --link:#7fb0ff;
+  --good:#5cc98a; --warn:#f0a648; --bad:#ff8a80; color-scheme:dark }
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.5}
+.wrap{max-width:1180px;margin:0 auto;padding-block:28px 56px;
+  padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));
+  display:grid;gap:22px}
+h1,h2{font-family:var(--display);margin:0;text-wrap:balance;letter-spacing:-.01em}
+h1{font-size:clamp(28px,4vw,40px);font-weight:800}
+h2{font-size:19px;font-weight:700}
+.eyebrow{font:600 11px/1.2 var(--body);text-transform:uppercase;letter-spacing:.12em;color:var(--muted)}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+a{color:var(--link)}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px}
+header p{margin:6px 0 0;color:var(--muted);max-width:62ch}
+.studs{display:inline-flex;gap:5px;margin-right:10px;vertical-align:middle}
+.studs i{width:12px;height:12px;border-radius:50%;background:var(--accent);box-shadow:inset 0 -2px 0 rgba(0,0,0,.18)}
+.example{display:inline-block;font-size:12px;font-weight:600;color:var(--accent-ink);background:var(--accent);padding:3px 9px;border-radius:99px}
+
+.lookup{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;
+  display:grid;grid-template-columns:repeat(4,minmax(0,1fr)) auto;gap:12px;align-items:end}
+.lookup .wide{grid-column:span 1}
+label{display:grid;gap:5px;font-size:12px;font-weight:600;color:var(--muted)}
+label.check{display:flex;align-items:center;gap:8px;font-weight:500;color:var(--fg);font-size:13px}
+label.check input{width:auto}
+input,select{font:inherit;color:var(--fg);background:var(--sunk);border:1px solid var(--line);border-radius:7px;padding:9px 10px;width:100%;min-width:0}
+input.num{font-family:var(--mono)}
+button{font:600 14px var(--body);border-radius:7px;padding:10px 14px;cursor:pointer;border:1px solid var(--line);background:var(--surface);color:var(--fg)}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:transparent}
+button:hover{filter:brightness(.96)}
+
+.main{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:22px;align-items:start}
+.col{display:grid;gap:22px;min-width:0}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px;min-width:0}
+.panel-head{display:grid;gap:4px;margin-bottom:12px}
+.hint{color:var(--muted);font-size:13px;margin:0}
+
+.tbl{overflow-x:auto}
+table{width:100%;border-collapse:collapse;min-width:480px}
+th{font:600 11px var(--body);text-transform:uppercase;letter-spacing:.08em;color:var(--muted);text-align:left;padding:6px 8px;border-bottom:1px solid var(--line)}
+td{padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
+tr:last-child td{border-bottom:0}
+td.site{white-space:nowrap}
+td.site a{font-weight:600;text-decoration:none}
+td.site a:hover{text-decoration:underline}
+td.site small{display:block;color:var(--muted);font-size:12px;font-weight:400}
+td input{width:110px;padding:7px 8px}
+.kind{font-size:11px;padding:2px 7px;border-radius:99px;background:var(--sunk);color:var(--muted);white-space:nowrap}
+.kind.in{color:var(--good)}
+.kind.lr{color:var(--link)}
+.statrow{display:flex;flex-wrap:wrap;gap:12px;margin-top:14px}
+.stat{background:var(--sunk);border-radius:8px;padding:10px 12px;flex:1 1 150px}
+.stat b{display:block;font:600 20px var(--mono)}
+.stat span{font-size:12px;color:var(--muted)}
+
+.tag{position:sticky;top:calc(env(safe-area-inset-top, 0px) + 14px);display:grid;gap:14px}
+.steps{display:grid;gap:0;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.step{display:grid;grid-template-columns:1fr auto;gap:10px;padding:9px 12px;border-bottom:1px solid var(--line);align-items:baseline}
+.step:last-child{border-bottom:0}
+.step .k{font-size:13px;font-weight:600}
+.step .k small{display:block;font-weight:400;color:var(--muted);font-size:12px}
+.step .v{font:600 15px var(--mono);text-align:right;white-space:nowrap}
+.step.floorhit .v{color:var(--warn)}
+.final{background:var(--fg);color:var(--bg);border-radius:10px;padding:14px 16px;display:grid;gap:4px}
+.final .big{font:800 42px/1.1 var(--display)}
+.final .why{font-size:13px;opacity:.8}
+.split{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.split div{background:var(--sunk);border-radius:8px;padding:8px 10px;min-width:0}
+.split b{display:block;font:600 15px var(--mono)}
+.split span{font-size:11px;color:var(--muted)}
+.copyrow{display:flex;gap:8px;flex-wrap:wrap}
+.copyrow button{flex:1}
+#copied{font-size:13px;color:var(--good);min-height:1.2em}
+.warn{color:var(--warn);font-size:13px;margin:0}
+.err{color:var(--bad);font-size:13px;margin:0}
+.discount{display:grid;grid-template-columns:1fr 90px;gap:10px}
+.discount .full{grid-column:1/-1}
+.rules{font-size:13px;color:var(--muted);margin:0;padding-left:18px;display:grid;gap:4px}
+.rules b{color:var(--fg);font-weight:600}
+
+.lookup{grid-template-columns:repeat(3,minmax(0,1fr))}
+.lookup .act{grid-column:auto;align-self:end}
+.item{display:flex;gap:14px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 16px}
+.thumb{width:72px;height:72px;flex:none;border-radius:8px;background:var(--sunk) center/contain no-repeat}
+.itemtext{display:grid;gap:2px;min-width:0;flex:1}
+.itemtext b{font:700 18px var(--display)}
+.srcs{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+.src{font-size:11px;padding:2px 8px;border-radius:99px;background:var(--sunk);color:var(--muted)}
+.src.ok{color:var(--good)}
+.src.bad{color:var(--warn)}
+.lkstate{font-size:13px;color:var(--muted);white-space:nowrap}
+.conn{padding:12px 18px}
+.conn summary{cursor:pointer;display:flex;flex-wrap:wrap;gap:10px;align-items:baseline}
+.connbody{display:grid;gap:10px;margin-top:12px}
+.filled{box-shadow:inset 0 0 0 1px var(--good)}
+.syncbox{display:grid;gap:10px;border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:14px;background:var(--sunk)}
+.syncbox .stat{background:var(--surface)}
+.chg{font-size:11px;font-weight:600;padding:2px 8px;border-radius:99px;background:var(--surface)}
+.chg.add{color:var(--good)} .chg.upd{color:var(--link)} .chg.del{color:var(--bad)} .chg.keep{color:var(--muted)}
+.importrow{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.usedbox{display:flex;justify-content:space-between;align-items:center;gap:10px;border:1px solid var(--line);border-radius:10px;padding:10px 14px}
+.usedbox > div{display:grid;gap:2px;min-width:0}
+.usedbox b{font:800 28px var(--display)}
+.addowned{display:grid;gap:8px;border-top:2px dashed var(--line);padding-top:12px}
+.addrow{display:flex;flex-wrap:wrap;gap:10px;align-items:end}
+.addrow button{flex:1 1 140px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+.seg label{display:flex;align-items:center;gap:6px;padding:8px 12px;font-size:14px;color:var(--fg);cursor:pointer;font-weight:600}
+.seg label:has(input:checked){background:var(--accent);color:var(--accent-ink)}
+.seg input{width:auto;accent-color:var(--accent-ink)}
+.qty{width:72px}
+.qty input{padding:8px}
+.ownsum{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:12px}
+.ownsum .stat{flex:1 1 140px}
+.owntbl{min-width:760px}
+.owntbl td{font-size:14px}
+.owntbl td.n{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+.owntbl td.n.on{font-weight:600}
+.owntbl td.n.off{color:var(--muted)}
+.owntbl select,.owntbl input{padding:5px 7px;font-size:13px}
+.owntbl input{width:60px}
+.owntbl .acts{display:flex;gap:6px;justify-content:flex-end}
+.owntbl .acts button{padding:5px 9px;font-size:13px}
+.owntbl small{display:block;color:var(--muted);font-size:12px}
+.pill{font-size:11px;font-weight:600;padding:2px 8px;border-radius:99px;background:var(--sunk)}
+@media (max-width:900px){
+  .main{grid-template-columns:1fr}
+  .tag{position:static}
+  .lookup{grid-template-columns:1fr 1fr}
+  .lookup .act{grid-column:1/-1}
+  .item{flex-wrap:wrap}
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div>
+      <div class="eyebrow">Central Brick Society · consignment pricing</div>
+      <h1><span class="studs" aria-hidden="true"><i></i><i></i><i></i><i></i></span>Brick Price Check</h1>
+      <p>Prices a set the same way as the Pricing tab in your Consignment Tracker: average of four sites, never below retail, shelf price from the LR Suggested Price rounded to $5, then any condition discount.</p>
+    </div>
+    <span class="example" id="exampleBadge">Example: 42127 from your tracker</span>
+  </header>
+
+  <form class="lookup" id="lookup" autocomplete="off">
+    <label>Item type
+      <select id="itemType">
+        <option value="auto">Detect from number</option>
+        <option value="set">Set</option>
+        <option value="minifig">Minifigure</option>
+        <option value="part">Part</option>
+        <option value="element">LEGO element ID</option>
+      </select>
+    </label>
+    <label>Number<input id="setNum" class="num" placeholder="75192, sw0001, 3001, 4211398" value="42127"></label>
+    <label>Name<input id="setName" placeholder="Fills in from lookup" value="The Batman - Batmobile"></label>
+    <label>Retail (Brickset RRP)<input id="rrp" class="num" inputmode="decimal" placeholder="$" value="99.99"></label>
+    <label>Initial cost (each)<input id="cost" class="num" inputmode="decimal" placeholder="$ optional" value=""></label>
+    <label id="colorWrap" hidden>Color (BrickLink)
+      <select id="partColor"><option value="">Pick a color</option></select>
+    </label>
+    <div class="act" style="display:flex;gap:8px">
+      <button type="submit" class="primary" id="lookupBtn">Look up</button>
+      <button type="button" id="clearBtn">Clear</button>
+    </div>
+  </form>
+
+  <div class="item" id="itemCard">
+    <div class="thumb" id="itemImg" aria-hidden="true"></div>
+    <div class="itemtext">
+      <div class="eyebrow" id="itemKind">Set</div>
+      <b id="itemName">The Batman - Batmobile</b>
+      <span class="hint" id="itemMeta">Example row from your tracker</span>
+      <div class="srcs" id="srcStatus"></div>
+    </div>
+    <span class="lkstate" id="lookupState"></span>
+  </div>
+
+  <details class="panel conn" id="connPanel">
+    <summary><b>Live data connection</b> <span class="hint" id="connSummary">Not connected. Prices are typed in by hand.</span></summary>
+    <div class="connbody">
+      <p class="hint">Live lookups use the CBS Pricing API in your Consignment Tracker (Google Apps Script), which holds your BrickLink, Brickset, BrickEconomy and Rebrickable keys. Paste its web app URL here. Saved in this browser only.</p>
+      <div style="display:grid;grid-template-columns:minmax(0,3fr) minmax(0,1fr) auto;gap:10px;align-items:end">
+        <label>Web app URL<input id="apiUrl" placeholder="https://script.google.com/macros/s/…/exec"></label>
+        <label>Token (if set)<input id="apiToken" type="password" placeholder="optional"></label>
+        <button type="button" id="testConn">Save and test</button>
+      </div>
+      <p class="hint" id="connMsg"></p>
+    </div>
+  </details>
+
+  <div class="main">
+    <div class="col">
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Your four price sites</h2>
+          <p class="hint">New figures make the Avg market value. Used figures price a used copy. Leave a box blank if that site has no sales, as the tracker does.</p>
+        </div>
+        <div class="tbl"><table>
+          <thead><tr><th>Site</th><th>Use</th><th>New $</th><th>Used $</th></tr></thead>
+          <tbody id="coreRows"></tbody>
+        </table></div>
+        <div class="statrow">
+          <div class="stat"><span>Avg market value, new</span><b class="num" id="avgVal">–</b><span id="avgMeta"></span></div>
+          <div class="stat"><span>Avg market value, used</span><b class="num" id="usedAvgVal">–</b><span id="usedAvgMeta"></span></div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>LR Suggested Price</h2>
+          <p class="hint">Run <span class="num">!price <span id="cmdNum">42127</span></span> with DasBot in the Lego_Raffles Discord and enter its recommended price. If you don't have it, the app estimates it the way DasBot describes: from BrickLink 3-month, BrickLink 6-month and BrickEconomy, or retail if LEGO still sells the set.</p>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;align-items:end">
+          <label>DasBot recommended price<input id="lr" class="num" inputmode="decimal" placeholder="$ from !price" value="140.00"></label>
+          <label>BrickLink 3-mo sold avg, new<input id="bl3" class="num" inputmode="decimal" placeholder="$ for estimate"></label>
+          <label class="check"><input type="checkbox" id="atRetail"> LEGO still sells this set</label>
+        </div>
+        <p class="hint" id="lrNote" style="margin-top:10px"></p>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Other sites to check</h2>
+          <p class="hint">Not part of your formula. Use these to see whether the price holds up. Their average shows below.</p>
+        </div>
+        <div class="tbl"><table>
+          <thead><tr><th>Site</th><th>Shows</th><th>New $</th><th>Used $</th></tr></thead>
+          <tbody id="extraRows"></tbody>
+        </table></div>
+        <div class="statrow">
+          <div class="stat"><span>Other sites average</span><b class="num" id="extraAvg">–</b><span id="extraMeta"></span></div>
+        </div>
+      </section>
+    </div>
+
+    <aside class="panel tag" aria-live="polite">
+      <div class="eyebrow">How the price is built</div>
+      <div class="steps">
+        <div class="step"><span class="k">Avg market value<small id="s1m">Four sites</small></span><span class="v" id="s1">–</span></div>
+        <div class="step" id="floorStep"><span class="k">Price floor<small>Retail or initial cost, whichever is higher</small></span><span class="v" id="s2">–</span></div>
+        <div class="step"><span class="k">Recommended price<small>Average, never below the floor</small></span><span class="v" id="s3">–</span></div>
+        <div class="step" id="shelfStep"><span class="k">Normal shelf price<small id="s4m">LR price rounded to $5, never below the floor</small></span><span class="v" id="s4">–</span></div>
+      </div>
+
+      <div>
+        <div class="eyebrow" style="margin-bottom:6px">Condition discount</div>
+        <div class="discount">
+          <label>Condition
+            <select id="cond">
+              <option value="0">No discount</option>
+              <option value="5">Minor dents (5%)</option>
+              <option value="10">Major crease (10%)</option>
+              <option value="15">Crushed box, multiple large dents (15%)</option>
+              <option value="15b">Box opened, tape broken, all bags sealed and complete (15%)</option>
+              <option value="custom">Other</option>
+            </select>
+          </label>
+          <label>% off<input id="pct" class="num" type="number" min="0" max="95" step="1" value="0"></label>
+          <label class="full">Discount reason<input id="reason" placeholder="Every discount needs a reason"></label>
+        </div>
+        <p class="err" id="reasonErr" hidden style="margin-top:6px">Add a reason for this discount.</p>
+      </div>
+
+      <div class="final">
+        <span class="eyebrow" style="color:inherit;opacity:.7">Set price</span>
+        <span class="big num" id="finalVal">–</span>
+        <span class="why" id="finalWhy"></span>
+      </div>
+
+      <div class="usedbox">
+        <div><span class="eyebrow">Used price</span><span class="hint" id="usedWhy">Enter used prices from the sites</span></div>
+        <b class="num" id="usedVal">–</b>
+      </div>
+
+      <div class="addowned">
+        <div class="eyebrow">Add to owned</div>
+        <div class="addrow">
+          <div class="seg" role="radiogroup" aria-label="Condition of your copy">
+            <label><input type="radio" name="ownCond" value="new" checked> New</label>
+            <label><input type="radio" name="ownCond" value="used"> Used</label>
+          </div>
+          <label class="qty">Qty<input id="ownQty" class="num" type="number" min="1" step="1" value="1"></label>
+          <button type="button" class="primary" id="addOwnedBtn">Add to owned</button>
+        </div>
+        <p class="hint" id="addMsg"></p>
+      </div>
+
+      <div>
+        <div class="eyebrow" style="margin-bottom:6px">Consignment split · CBS keeps <input id="rate" class="num" type="number" min="0" max="100" step="0.5" value="35" style="width:62px;padding:3px 6px;display:inline-block" aria-label="CBS consignment rate percent">%</div>
+        <div class="split">
+          <div><span>Sale price</span><b id="spSale">–</b></div>
+          <div><span>Consignor</span><b id="spCons">–</b></div>
+          <div><span>CBS</span><b id="spCbs">–</b></div>
+        </div>
+        <div class="split" style="margin-top:8px">
+          <div><span>With 5% member/employee</span><b id="mdSale">–</b></div>
+          <div><span>Consignor</span><b id="mdCons">–</b></div>
+          <div><span>CBS</span><b id="mdCbs">–</b></div>
+        </div>
+      </div>
+
+      <p class="warn" id="checkNote" hidden></p>
+
+      <div class="copyrow">
+        <button type="button" class="primary" id="copyBtn">Copy for the tracker</button>
+      </div>
+      <div id="copied"></div>
+      <textarea id="copyFallback" hidden readonly rows="4" style="width:100%;font:13px var(--mono);background:var(--sunk);color:var(--fg);border:1px solid var(--line);border-radius:7px;padding:8px"></textarea>
+
+      <ul class="rules">
+        <li><b>Never below retail</b> (or initial cost, if higher) unless a condition discount is applied.</li>
+        <li><b>Discounts</b> come off the normal price and may take a damaged set below retail.</li>
+        <li><b>Member/employee 5%:</b> split 65/35 on the discounted price.</li>
+        <li><b>Used price</b> is the average of the used figures you enter, rounded to $1. Used counts as a condition discount, so it isn't held to retail.</li>
+      </ul>
+    </aside>
+  </div>
+
+  <section class="panel" id="owned">
+    <div class="panel-head" style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:end;gap:10px">
+      <div style="display:grid;gap:4px">
+        <h2>Owned sets</h2>
+        <p class="hint">Each set keeps its new and used price from when you priced it. Value uses the price for its condition. Saved in this browser only, so copy or download the list to keep a backup.</p>
+      </div>
+      <div class="copyrow">
+        <button type="button" id="copyCsvBtn">Copy as spreadsheet rows</button>
+        <button type="button" id="dlCsvBtn">Download CSV</button>
+      </div>
+    </div>
+    <div class="syncbox" id="syncBox">
+      <div style="display:grid;gap:4px">
+        <b>Collection sync · Brickset is the master</b>
+        <p class="hint">Pull what you own from Brickset into this list, then bring Rebrickable in line with it. BrickLink and BrickEconomy have no API for changing a collection, so you get files to upload there instead. Needs the live data connection.</p>
+      </div>
+      <div class="copyrow">
+        <button type="button" class="primary" id="pullBtn">Pull from Brickset</button>
+        <button type="button" id="previewBtn">Preview sync</button>
+      </div>
+      <div id="syncOut" hidden>
+        <div class="statrow" id="syncStats"></div>
+        <div class="tbl"><table class="owntbl" style="min-width:420px"><thead><tr><th>Rebrickable change</th><th>Set</th><th>Now</th><th>After</th></tr></thead><tbody id="syncRows"></tbody></table></div>
+        <label class="check" style="margin-top:8px"><input type="checkbox" id="removeExtras"> Also remove sets from Rebrickable that aren't in Brickset</label>
+        <div class="copyrow" style="margin-top:8px">
+          <button type="button" class="primary" id="pushBtn">Push changes to Rebrickable</button>
+          <button type="button" id="copyBlXml">Copy BrickLink wanted list (XML)</button>
+          <button type="button" id="copyCollCsv">Copy collection CSV (for BrickEconomy)</button>
+        </div>
+        <p class="hint">BrickLink: Want > Upload, then paste the XML. Nothing is sent to your BrickLink store. BrickEconomy: use its collection import, if your plan has one, with the CSV.</p>
+      </div>
+      <p class="hint" id="syncMsg"></p>
+      <textarea id="syncFallback" hidden readonly rows="5" style="width:100%;font:13px var(--mono);background:var(--sunk);color:var(--fg);border:1px solid var(--line);border-radius:7px;padding:8px"></textarea>
+    </div>
+    <div class="importrow" style="margin-bottom:12px">
+      <label for="importFile" class="hint" style="display:inline">Import a list from Brickset, Rebrickable, BrickLink (XML) or BrickEconomy (CSV):</label>
+      <input type="file" id="importFile" accept=".csv,.xml,.txt,text/csv,text/xml" style="width:auto;flex:1 1 220px">
+      <button type="button" id="priceAllBtn">Price all with live data</button>
+    </div>
+    <div class="ownsum" id="ownSum"></div>
+    <div class="tbl"><table class="owntbl">
+      <thead><tr><th>Set</th><th>Condition</th><th>Qty</th><th>New price</th><th>Used price</th><th>Value</th><th>Priced</th><th></th></tr></thead>
+      <tbody id="ownRows"></tbody>
+    </table></div>
+    <p class="hint" id="ownEmpty">No sets yet. Price a set above, pick New or Used, and choose Add to owned.</p>
+    <p class="hint" id="ownMsg" style="color:var(--good)"></p>
+    <textarea id="csvFallback" hidden readonly rows="5" style="width:100%;font:13px var(--mono);background:var(--sunk);color:var(--fg);border:1px solid var(--line);border-radius:7px;padding:8px"></textarea>
+  </section>
+</div>
+
+<script src="pricing.js"></script>
+<script>
+// The four sources the tracker averages (Pricing tab, cols N, O, Q, R)
+// BrickLink catalog letter per item type
+const BL_LETTER = {set:"S", minifig:"M", part:"P", element:"P"};
+const CORE = [
+  {id:"bs", name:"Brickset", note:"Value, new", url:s=> s.type==="set" ? `https://brickset.com/sets/${s.full}` : `https://brickset.com/search?query=${s.num}`},
+  {id:"bl6", name:"BrickLink", note:"6-month sold avg", url:s=>`https://www.bricklink.com/v2/catalog/catalogitem.page?${BL_LETTER[s.type]}=${s.type==="set"?s.full:s.num}#T=P`},
+  {id:"be", name:"BrickEconomy", note:"Value", url:s=>`https://www.brickeconomy.com/search?query=${s.num}`},
+  {id:"bo", name:"Brick Owl", note:"Sold avg", url:s=>`https://www.brickowl.com/search/catalog?query=${s.num}`},
+];
+const EXTRA = [
+  {id:"ebs", name:"eBay", note:"Sold listings", kind:"Sold", url:s=>`https://www.ebay.com/sch/i.html?_nkw=${s.q}&LH_Sold=1&LH_Complete=1`},
+  {id:"wp", name:"WorthPoint", note:"Sold history", kind:"Sold", url:s=>`https://www.worthpoint.com/inventory/search?query=${s.q}`},
+  {id:"ebl", name:"eBay", note:"Active listings", kind:"Asking", url:s=>`https://www.ebay.com/sch/i.html?_nkw=${s.q}`},
+  {id:"amz", name:"Amazon", note:"New, incl. 3rd party", kind:"Asking", url:s=>`https://www.amazon.com/s?k=${s.q}`},
+  {id:"wm", name:"Walmart", note:"New", kind:"Asking", url:s=>`https://www.walmart.com/search?q=${s.q}`},
+  {id:"tg", name:"Target", note:"New", kind:"Asking", url:s=>`https://www.target.com/s?searchTerm=${s.q}`},
+  {id:"mc", name:"Mercari", note:"Marketplace", kind:"Asking", url:s=>`https://www.mercari.com/search/?keyword=${s.q}`},
+  {id:"fb", name:"Facebook Marketplace", note:"Local", kind:"Asking", url:s=>`https://www.facebook.com/marketplace/search/?query=${s.q}`},
+  {id:"ou", name:"OfferUp", note:"Local", kind:"Asking", url:s=>`https://offerup.com/search?q=${s.q}`},
+  {id:"lg", name:"LEGO.com", note:"Current retail, still sold?", kind:"Retail", url:s=>`https://www.lego.com/en-us/search?q=${s.num}`},
+];
+// Example: 42127 row from the user's Pricing tab
+const EXAMPLE = {bs:107.00, bl6:113.04, be:140.00, bo:133.02};
+
+const $ = id => document.getElementById(id);
+const parse = v => { const n = parseFloat(String(v).replace(/[$,\s]/g,"")); return isFinite(n) && n>0 ? n : null; };
+const money = (v, cents=true) => v==null||isNaN(v) ? "–" : "$" + v.toLocaleString("en-US",{minimumFractionDigits:cents?2:0, maximumFractionDigits:cents?2:0});
+const round2 = v => Math.round(v*100)/100;
+const round5 = v => Math.round(v/5)*5;
+const store = { get(k){try{return JSON.parse(localStorage.getItem(k));}catch(e){return null;}}, set(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}} };
+
+// Same detection rules as the Apps Script lookup
+function detectType(q){
+  if(/^fig-\d+$/i.test(q)) return "minifig";
+  if(/^[a-z]{2,4}\d{3,4}[a-z]?$/i.test(q)) return "minifig";
+  if(/^\d{3,6}(-\d+)?$/.test(q)) return "set";
+  if(/^\d{7}$/.test(q)) return "element";
+  return q ? "part" : "set";
+}
+function setInfo(){
+  const raw = $("setNum").value.trim().replace(/\s+/g,"");
+  const sel = $("itemType").value;
+  const type = sel==="auto" ? detectType(raw) : sel;
+  const num = type==="set" ? raw.replace(/-\d+$/,"") : raw;
+  const full = type!=="set" ? raw : (/-\d+$/.test(raw) ? raw : (raw ? raw + "-1" : ""));
+  const q = encodeURIComponent(("lego " + num + " " + $("setName").value.trim()).trim()).replace(/%20/g,"+");
+  return {num:encodeURIComponent(num), full:encodeURIComponent(full), q, raw:num, type};
+}
+
+function row(site, val, kindHtml){
+  const tr = document.createElement("tr"); tr.dataset.id = site.id;
+  tr.innerHTML = `<td class="site"><a target="_blank" rel="noopener">${site.name} ↗</a><small>${site.note}</small></td>
+    <td>${kindHtml}</td>
+    <td><input class="num" id="p_${site.id}" inputmode="decimal" placeholder="$" value="${val ?? ""}" aria-label="${site.name} ${site.note} new price"></td>
+    <td><input class="num" id="u_${site.id}" inputmode="decimal" placeholder="$" value="" aria-label="${site.name} ${site.note} used price"></td>`;
+  return tr;
+}
+function buildRows(prefill){
+  $("coreRows").innerHTML = ""; $("extraRows").innerHTML = "";
+  CORE.forEach(s=>$("coreRows").appendChild(row(s, prefill && prefill[s.id], `<span class="kind in">In average</span>`)));
+  EXTRA.forEach(s=>$("extraRows").appendChild(row(s, null, `<span class="kind">${s.kind}</span>`)));
+  refreshLinks();
+}
+function refreshLinks(){
+  const s = setInfo();
+  [...CORE, ...EXTRA].forEach(site=>{
+    const a = document.querySelector(`tr[data-id="${site.id}"] a`);
+    if(s.num){ a.href = site.url(s); a.removeAttribute("aria-disabled"); } else { a.removeAttribute("href"); a.setAttribute("aria-disabled","true"); }
+  });
+  $("cmdNum").textContent = s.raw || "<set #>";
+}
+
+const mean = a => a.reduce((x,y)=>x+y,0)/a.length;
+let summary = "", current = {};
+
+// Map page inputs to the shared engine's site names
+const SITE_KEY = {bs:"brickset", bl6:"bricklink6", be:"brickeconomy", bo:"brickowl"};
+function engineInput(){
+  const nw = {bricklink3: $("bl3").value}, used = {};
+  CORE.forEach(c=>{ nw[SITE_KEY[c.id]] = $("p_"+c.id).value; used[SITE_KEY[c.id]] = $("u_"+c.id).value; });
+  return {
+    "new": nw, used, usedOther: EXTRA.map(x=>$("u_"+x.id).value),
+    rrp: $("rrp").value, cost: $("cost").value, lr: $("lr").value,
+    itemType: setInfo().type, stillAtRetail: $("atRetail").checked, discount: $("pct").value, consignmentRate: $("rate").value
+  };
+}
+
+function calc(){
+  const s = setInfo();
+  const R = BrickPricing.priceSet(engineInput());
+  const avg = R.avgMarketValue, floor = R.priceFloor, rec = R.recommendedPrice, lr = R.lrSuggestedPrice;
+  const normal = R.normalShelfPrice, pct = R.discountPct, finalPx = R.setPrice, usedPx = R.usedPrice;
+
+  $("avgVal").textContent = money(avg);
+  $("avgMeta").textContent = R.sourcesInAverage ? `${R.sourcesInAverage} source${R.sourcesInAverage>1?"s":""}, range ${money(R.sourceRange[0])}–${money(R.sourceRange[1])}` : "Enter at least one site";
+
+  const lrSrc = {dasbot:"DasBot !price", retail:"retail (LEGO still sells it)", estimate:"estimate from BL3, BL6 and BE"}[R.lrSource];
+  $("lrNote").textContent = lr==null ? "No LR price yet. The shelf price falls back to the recommended price, as the tracker does."
+    : `Using ${money(lr)} (${lrSrc}).` + (R.lrSource==="estimate" ? " This is an estimate; DasBot's own number may differ." : "");
+
+  const s4m = R.normalSource==="lr" ? `LR ${money(lr)} rounded to $5`
+    : R.normalSource==="floor" ? `LR ${money(lr)} rounded to $5, raised to the floor`
+    : R.normalSource==="recommended" ? "No LR price, so the recommended price" : "LR price rounded to $5, never below the floor";
+
+  $("s1").textContent = money(avg); $("s1m").textContent = R.sourcesInAverage ? `${R.sourcesInAverage} of 4 sites` : "Four sites";
+  $("s2").textContent = floor ? money(floor) : "–";
+  $("s3").textContent = money(rec, false);
+  $("s4").textContent = money(normal, false); $("s4m").textContent = s4m;
+  $("floorStep").classList.toggle("floorhit", !!(floor && avg!=null && avg < floor));
+
+  const reason = $("reason").value.trim();
+  $("reasonErr").hidden = !(pct>0 && !reason);
+  $("finalVal").textContent = money(finalPx, false);
+  $("finalWhy").textContent = normal==null ? "Enter site prices or retail to begin."
+    : pct>0 ? `${money(normal,false)} normal price, ${pct}% off${reason?` for ${reason.toLowerCase()}`:""}` : `Normal shelf price, no condition discount`;
+
+  $("spSale").textContent=money(R.split.price); $("spCons").textContent=money(R.split.consignor); $("spCbs").textContent=money(R.split.cbs);
+  $("mdSale").textContent=money(R.memberSplit.price); $("mdCons").textContent=money(R.memberSplit.consignor); $("mdCbs").textContent=money(R.memberSplit.cbs);
+
+  const usedCoreN = CORE.filter(c=>parse($("u_"+c.id).value)!=null).length;
+  $("usedAvgVal").textContent = money(usedCoreN ? R.usedAvgMarketValue : null);
+  $("usedAvgMeta").textContent = usedCoreN ? `${usedCoreN} source${usedCoreN>1?"s":""}` : "Optional";
+  $("usedVal").textContent = money(usedPx, false);
+  $("usedWhy").textContent = usedPx==null ? "Enter used prices from the sites"
+    : `Average of ${R.usedSources} ${R.usedFrom==="core"?"of 4 sites":"other site"+(R.usedSources>1?"s":"")}, ${money(R.usedAvgMarketValue)}`;
+  current = {set:s.raw, name:$("setName").value.trim(), newPx:finalPx, usedPx};
+
+  // Other sites check
+  const extra = EXTRA.map(x=>parse($("p_"+x.id).value)).filter(v=>v!=null);
+  const xavg = extra.length ? round2(mean(extra)) : null;
+  $("extraAvg").textContent = money(xavg);
+  $("extraMeta").textContent = extra.length ? `${extra.length} site${extra.length>1?"s":""}` : "Optional";
+  const notes = [];
+  if(!floor && normal!=null) notes.push("Retail (Brickset RRP) is blank, so there's no floor protecting this price. Enter retail to make sure it never goes below it.");
+  if(R.belowRetail) notes.push(`Below retail (${money(floor)}) because of the ${pct}% condition discount.`);
+  if(R.wideSpread) notes.push(`Sources spread widely (${money(R.sourceRange[0],false)}–${money(R.sourceRange[1],false)}).`);
+  if(xavg!=null && normal!=null){
+    const diff = (normal/xavg-1)*100;
+    if(Math.abs(diff) >= 15) notes.push(`Normal shelf price is ${Math.abs(Math.round(diff))}% ${diff>0?"above":"below"} the other sites' average of ${money(xavg)}.`);
+  }
+  $("checkNote").hidden = !notes.length; $("checkNote").textContent = notes.join(" ");
+
+  const label = [s.raw, $("setName").value.trim()].filter(Boolean).join(" ");
+  summary = normal==null ? "" :
+    `${label}: set price ${money(finalPx,false)}` + (pct>0?` (${pct}% off ${money(normal,false)}, ${reason||"no reason given"})`:"") + `\n` +
+    `Avg market value ${money(avg)} · floor ${floor?money(floor):"none"} · recommended ${money(rec,false)} · LR ${lr!=null?money(lr):"none"}\n` +
+    `Consignor ${money(R.split.consignor)} / CBS ${money(R.split.cbs)} at ${Math.round(R.consignmentRate*1000)/10}%` +
+    (usedPx!=null ? `\nUsed price ${money(usedPx,false)}` : "");
+  store.set("bpc.rate", $("rate").value);
+}
+
+const COND_REASON = {"5":"Minor dents","10":"Major crease","15":"Crushed box with multiple large dents","15b":"Box opened, tape broken, all bags sealed and complete"};
+$("cond").addEventListener("change", ()=>{
+  const v = $("cond").value;
+  if(v!=="custom"){ $("pct").value = parseInt(v)||0; $("reason").value = COND_REASON[v]||""; }
+  else { $("reason").value = ""; $("reason").focus(); }
+  calc();
+});
+$("pct").addEventListener("input", ()=>{ $("cond").value = "custom"; calc(); });
+document.querySelector(".main").addEventListener("input", e=>{
+  if(e.target.id && e.target.id.startsWith("p_")) $("exampleBadge").hidden = true;
+  calc();
+});
+["rrp","cost"].forEach(id=>$(id).addEventListener("input", calc));
+$("clearBtn").addEventListener("click", ()=>{
+  $("setNum").value=""; $("cost").value=""; $("reason").value=""; clearItemData(); lastLooked=""; $("itemKind").textContent="Set"; $("lookupState").textContent="";
+  $("atRetail").checked=false; $("cond").value="0"; $("pct").value=0;
+  buildRows(null); $("exampleBadge").hidden = true; calc(); $("setNum").focus();
+});
+$("copyBtn").addEventListener("click", ()=>{
+  const msg = $("copied"), fb = $("copyFallback");
+  if(!summary){ msg.textContent = "Enter prices first."; return; }
+  navigator.clipboard.writeText(summary).then(()=>{ msg.textContent = "Copied."; fb.hidden = true; })
+    .catch(()=>{ fb.value = summary; fb.hidden = false; fb.select(); msg.textContent = "Select the text below and copy it."; });
+});
+
+// ---------- Owned sets ----------
+
+const FORM_IDS = ["itemType","setNum","setName","rrp","cost","lr","bl3","pct","reason"];
+function snapshot(){
+  const snap = {f:{}, p:{}, u:{}, atRetail:$("atRetail").checked, cond:$("cond").value};
+  FORM_IDS.forEach(id=>snap.f[id]=$(id).value);
+  [...CORE, ...EXTRA].forEach(x=>{ snap.p[x.id]=$("p_"+x.id).value; snap.u[x.id]=$("u_"+x.id).value; });
+  return snap;
+}
+function restore(snap){
+  FORM_IDS.forEach(id=>{ if(snap.f[id]!=null) $(id).value = snap.f[id]; });
+  $("atRetail").checked = !!snap.atRetail; $("cond").value = snap.cond || "0";
+  buildRows(null);
+  [...CORE, ...EXTRA].forEach(x=>{ $("p_"+x.id).value = snap.p[x.id]||""; $("u_"+x.id).value = snap.u[x.id]||""; });
+  $("exampleBadge").hidden = true; lastLooked = setInfo().raw;
+  $("itemName").textContent = snap.f.setName || snap.f.setNum; $("itemMeta").textContent = "Saved prices; choose Look up to refresh from live data";
+  $("colorWrap").hidden = !["part","element"].includes(setInfo().type);
+  refreshLinks(); calc();
+}
+let owned = store.get("bpc.owned") || [];
+const saveOwned = ()=> store.set("bpc.owned", owned);
+const esc = s => String(s??"").replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const valueOf = o => { const p = o.cond==="new" ? o.newPx : o.usedPx; return p==null ? null : p*(o.qty||1); };
+const fmtDate = iso => { try{ return new Date(iso).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}); }catch(e){ return ""; } };
+
+function renderOwned(){
+  const tb = $("ownRows"); tb.innerHTML = "";
+  owned.forEach((o,i)=>{
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td><b class="num">${esc(o.set)}</b> <span class="pill">${TYPE_LABEL[o.type||"set"]||"Set"}</span><small>${esc(o.name)||"&nbsp;"}${o.color&&o.color.name?" · "+esc(o.color.name):""}${o.notInBrickset?' · <span style="color:var(--warn)">no longer in Brickset</span>':""}</small></td>
+      <td><select data-i="${i}" data-k="cond" aria-label="Condition of ${esc(o.set)}"><option value="new"${o.cond==="new"?" selected":""}>New</option><option value="used"${o.cond==="used"?" selected":""}>Used</option></select></td>
+      <td><input data-i="${i}" data-k="qty" class="num" type="number" min="1" step="1" value="${o.qty||1}" aria-label="Quantity of ${esc(o.set)}"></td>
+      <td class="n ${o.cond==="new"?"on":"off"}">${money(o.newPx,false)}</td>
+      <td class="n ${o.cond==="used"?"on":"off"}">${money(o.usedPx,false)}</td>
+      <td class="n on">${money(valueOf(o),false)}</td>
+      <td><small>${o.priced?fmtDate(o.priced):"Not priced"}</small></td>
+      <td><div class="acts"><button type="button" data-i="${i}" data-a="load">Reprice</button><button type="button" data-i="${i}" data-a="del" aria-label="Remove ${esc(o.set)}">Remove</button></div></td>`;
+    tb.appendChild(tr);
+  });
+  $("ownEmpty").hidden = owned.length > 0;
+  const count = owned.reduce((a,o)=>a+(o.qty||1),0);
+  const tNew = owned.filter(o=>o.cond==="new").reduce((a,o)=>a+(valueOf(o)||0),0);
+  const tUsed = owned.filter(o=>o.cond==="used").reduce((a,o)=>a+(valueOf(o)||0),0);
+  const missing = owned.filter(o=>valueOf(o)==null).length;
+  $("ownSum").innerHTML = owned.length ? `
+    <div class="stat"><span>Sets owned</span><b>${count}</b><span>${owned.length} line${owned.length>1?"s":""}</span></div>
+    <div class="stat"><span>New sets value</span><b>${money(tNew,false)}</b></div>
+    <div class="stat"><span>Used sets value</span><b>${money(tUsed,false)}</b></div>
+    <div class="stat"><span>Total value</span><b>${money(tNew+tUsed,false)}</b><span>${missing?`${missing} without a price for their condition`:"&nbsp;"}</span></div>` : "";
+}
+$("ownRows").addEventListener("change", e=>{
+  const i = e.target.dataset.i, k = e.target.dataset.k; if(i==null || !k) return;
+  if(k==="cond") owned[i].cond = e.target.value;
+  if(k==="qty") owned[i].qty = Math.max(1, parseInt(e.target.value)||1);
+  saveOwned(); renderOwned();
+});
+let pendingDel = null;
+$("ownRows").addEventListener("click", e=>{
+  const b = e.target.closest("button"); if(!b) return;
+  const i = +b.dataset.i;
+  if(b.dataset.a==="load"){ if(!owned[i].snap){ $("setNum").value = owned[i].set; $("itemType").value = owned[i].type||"auto"; numberChanged(); window.scrollTo({top:0, behavior:"smooth"}); return; } restore(owned[i].snap); document.querySelector(`input[name=ownCond][value=${owned[i].cond}]`).checked = true; $("ownQty").value = owned[i].qty||1; $("addMsg").textContent = `Repricing ${owned[i].set}. Change any prices, then choose Add to owned to update it.`; window.scrollTo({top:0, behavior:"smooth"}); }
+  if(b.dataset.a==="del"){
+    if(pendingDel===i){ owned.splice(i,1); pendingDel=null; saveOwned(); renderOwned(); $("ownMsg").textContent = "Removed."; }
+    else { pendingDel = i; b.textContent = "Confirm"; setTimeout(()=>{ if(pendingDel===i){ pendingDel=null; renderOwned(); } }, 3000); }
+  }
+});
+$("addOwnedBtn").addEventListener("click", ()=>{
+  calc();
+  const cond = document.querySelector("input[name=ownCond]:checked").value;
+  if(!current.set){ $("addMsg").textContent = "Enter a set number first."; return; }
+  if(current.newPx==null && current.usedPx==null){ $("addMsg").textContent = "Enter some site prices first so the set has a price."; return; }
+  const qty = Math.max(1, parseInt($("ownQty").value)||1);
+  const entry = {set:current.set, name:current.name, type:setInfo().type, color:($("partColor").value ? {id:+$("partColor").value, name:$("partColor").selectedOptions[0].textContent.replace(/ \(\d+\)$/,"")} : null), cond, qty, newPx:current.newPx, usedPx:current.usedPx, priced:new Date().toISOString(), snap:snapshot()};
+  const at = owned.findIndex(o=>o.set===entry.set && o.cond===cond && (o.color&&o.color.id)===(entry.color&&entry.color.id));
+  if(at>=0){ owned[at] = entry; $("addMsg").textContent = `Updated ${entry.set} (${cond}) in owned sets.`; }
+  else { owned.push(entry); $("addMsg").textContent = `Added ${entry.set} (${cond}) to owned sets.`; }
+  const missing = cond==="new" ? entry.newPx==null : entry.usedPx==null;
+  if(missing) $("addMsg").textContent += ` It has no ${cond} price yet; enter ${cond} site prices and add it again.`;
+  saveOwned(); renderOwned();
+});
+function csv(sep){
+  const q = v => sep==="," ? `"${String(v??"").replace(/"/g,'""')}"` : String(v??"").replace(/\t/g," ");
+  const rows = [["Number","Type","Name","Color","Condition","Qty","New price","Used price","Value","Priced on"]]
+    .concat(owned.map(o=>[o.set,TYPE_LABEL[o.type||"set"],o.name,o.color&&o.color.name||"",o.cond==="new"?"New":"Used",o.qty||1,o.newPx??"",o.usedPx??"",valueOf(o)??"",o.priced?fmtDate(o.priced):""]));
+  return rows.map(r=>r.map(q).join(sep)).join("\n");
+}
+$("copyCsvBtn").addEventListener("click", ()=>{
+  if(!owned.length){ $("ownMsg").textContent = "Add a set first."; return; }
+  const text = csv("\t"), fb = $("csvFallback");
+  navigator.clipboard.writeText(text).then(()=>{ $("ownMsg").textContent = "Copied. Paste into Google Sheets."; fb.hidden = true; })
+    .catch(()=>{ fb.value = text; fb.hidden = false; fb.select(); $("ownMsg").textContent = "Select the text below and copy it."; });
+});
+$("dlCsvBtn").addEventListener("click", ()=>{
+  if(!owned.length){ $("ownMsg").textContent = "Add a set first."; return; }
+  try{
+    const url = URL.createObjectURL(new Blob([csv(",")], {type:"text/csv"}));
+    const a = document.createElement("a"); a.href = url; a.download = "owned-sets.csv"; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url), 2000);
+    $("ownMsg").textContent = "If no file appeared, use Copy as spreadsheet rows instead.";
+  }catch(e){ $("ownMsg").textContent = "Downloading isn't available here. Use Copy as spreadsheet rows."; }
+});
+
+// ---------- Live lookup ----------
+const TYPE_LABEL = {set:"Set", minifig:"Minifigure", part:"Part", element:"LEGO element"};
+const api = { url: store.get("bpc.apiUrl") || "", token: store.get("bpc.apiToken") || "" };
+$("apiUrl").value = api.url; $("apiToken").value = api.token;
+let lookupSeq = 0, lookupTimer = null, lastLooked = "";
+
+function apiCall(params){
+  const u = new URL(api.url);
+  Object.entries(params).forEach(([k,v])=>{ if(v!==undefined && v!==null && v!=="") u.searchParams.set(k, v); });
+  if(api.token) u.searchParams.set("token", api.token);
+  return fetch(u.toString()).then(r=>r.json()).then(j=>{ if(j && j.error) throw new Error(j.error); return j; });
+}
+function connSummary(st){
+  if(!api.url){ $("connSummary").textContent = "Not connected. Prices are typed in by hand."; return; }
+  if(!st){ $("connSummary").textContent = "Web app URL saved."; return; }
+  const on = ["bricklink","brickset","brickeconomy","rebrickable"].filter(k=>st[k]==="ready");
+  $("connSummary").textContent = on.length ? `Connected: ${on.map(k=>({bricklink:"BrickLink",brickset:"Brickset",brickeconomy:"BrickEconomy",rebrickable:"Rebrickable"}[k])).join(", ")}` : "Connected, but no source keys are set yet.";
+}
+connSummary();
+$("testConn").addEventListener("click", ()=>{
+  api.url = $("apiUrl").value.trim(); api.token = $("apiToken").value.trim();
+  store.set("bpc.apiUrl", api.url); store.set("bpc.apiToken", api.token);
+  if(!api.url){ $("connMsg").textContent = "Saved. Lookups are off until you add a URL."; connSummary(); return; }
+  $("connMsg").textContent = "Testing…";
+  apiCall({status:1}).then(st=>{
+    const parts = ["rebrickable","brickset","bricklink","brickeconomy"].map(k=>`${k}: ${st[k]}`);
+    $("connMsg").textContent = "Connected. " + parts.join(" · "); connSummary(st);
+  }).catch(err=>{ $("connMsg").textContent = connError(err); });
+});
+function connError(err){
+  const msg = String(err && err.message || err);
+  if(/Failed to fetch|NetworkError|Load failed|blocked/i.test(msg))
+    return "Couldn't reach the web app. Check the URL and that it's deployed with access you can use. Inside Claude's artifact viewer, outside connections are blocked; use the GitHub Pages copy for live lookups.";
+  return "The web app answered with an error: " + msg;
+}
+
+// Clear everything that belonged to the previous item
+function clearItemData(){
+  ["setName","rrp","lr","bl3"].forEach(id=>$(id).value="");
+  [...CORE, ...EXTRA].forEach(x=>{ $("p_"+x.id).value=""; $("u_"+x.id).value=""; $("p_"+x.id).classList.remove("filled"); $("u_"+x.id).classList.remove("filled"); });
+  ["rrp","bl3","setName"].forEach(id=>$(id).classList.remove("filled"));
+  $("atRetail").checked = false;
+  $("exampleBadge").hidden = true;
+  $("itemImg").style.backgroundImage = ""; $("itemName").textContent = "–"; $("itemMeta").textContent = ""; $("srcStatus").innerHTML = "";
+}
+function showColors(list, chosen){
+  const sel = $("partColor");
+  sel.innerHTML = `<option value="">Pick a color</option>` + (list||[]).map(c=>`<option value="${c.id}"${String(c.id)===String(chosen)?" selected":""}>${esc(c.name)}${c.qty?` (${c.qty})`:""}</option>`).join("");
+}
+function setVal(id, v){ const el=$(id); if(v!=null && v!==""){ el.value = v; el.classList.add("filled"); } }
+
+// Turn a lookup result into engine input and form values
+function valuesFromLookup(r){
+  const bl = (r.prices && r.prices.bricklink) || {}, be = (r.prices && r.prices.brickeconomy) || {};
+  const n = bl.new || {}, u = bl.used || {};
+  return {
+    name: r.name || "", rrp: r.rrp,
+    p: {bl6: n.avg6, be: be.newValue}, u: {bl6: u.avg6, be: be.usedValue}, bl3: n.avg3,
+    engine: {itemType: r.type, rrp: r.rrp, "new": {bricklink6:n.avg6, bricklink3:n.avg3, brickeconomy:be.newValue}, used:{bricklink6:u.avg6, brickeconomy:be.usedValue}}
+  };
+}
+function srcPills(r){
+  const st = r.prices || {}, pills = [];
+  const add = (name, s)=> pills.push(`<span class="src ${s==="ok"?"ok":(s&&s!=="no key"?"bad":"")}">${name}: ${s||"not used"}</span>`);
+  add("Rebrickable", r.rebrickable && r.rebrickable.status);
+  if(r.type==="set") add("Brickset", st.brickset && st.brickset.status);
+  add("BrickLink", st.bricklink && st.bricklink.status);
+  if(r.type==="set"||r.type==="minifig") add("BrickEconomy", st.brickeconomy && st.brickeconomy.status);
+  return pills.join("");
+}
+
+function runLookup(){
+  const s = setInfo();
+  $("colorWrap").hidden = !(s.type==="part" || s.type==="element");
+  $("itemKind").textContent = TYPE_LABEL[s.type];
+  if(!s.raw){ $("lookupState").textContent = ""; return; }
+  if(!api.url){ $("lookupState").textContent = "Connect live data to fill this in automatically"; $("itemName").textContent = s.raw; return; }
+  const color = $("partColor").value;
+  const seq = ++lookupSeq;
+  $("lookupState").textContent = "Looking up…"; $("lookupBtn").disabled = true;
+  apiCall({lookup:s.raw, type:$("itemType").value, color}).then(r=>{
+    if(seq!==lookupSeq) return;                      // a newer lookup started
+    $("lookupBtn").disabled = false;
+    if(!r.found){ $("lookupState").textContent = `Nothing found for ${s.raw}`; $("srcStatus").innerHTML = srcPills(r); return; }
+    const v = valuesFromLookup(r);
+    setVal("setName", v.name); setVal("rrp", v.rrp); setVal("bl3", v.bl3);
+    Object.entries(v.p).forEach(([k,x])=>setVal("p_"+k, x));
+    Object.entries(v.u).forEach(([k,x])=>setVal("u_"+k, x));
+    $("itemName").textContent = r.name || s.raw;
+    $("itemKind").textContent = TYPE_LABEL[r.type] + (r.color && r.color.name ? ` · ${r.color.name}` : "") + (r.elementOf ? ` · part ${r.elementOf}` : "");
+    $("itemMeta").textContent = [r.number, r.year, r.pieces ? `${r.pieces} pieces` : "", r.minifigs ? `${r.minifigs} minifigs` : "", r.theme].filter(Boolean).join(" · ");
+    $("itemImg").style.backgroundImage = r.image ? `url("${r.image.replace(/"/g,"")}")` : "";
+    $("srcStatus").innerHTML = srcPills(r);
+    if(r.colors && r.colors.length){ showColors(r.colors, r.color && r.color.id); }
+    const pick = (r.type==="part"||r.type==="element") && !r.color && r.colors && r.colors.length;
+    $("lookupState").textContent = pick ? "Pick a color to get prices" : "Filled from live data";
+    if(r.type!==s.type && $("itemType").value==="auto") $("itemType").dataset.detected = r.type;
+    current.type = r.type; current.color = r.color;
+    refreshLinks(); calc();
+  }).catch(err=>{
+    if(seq!==lookupSeq) return;
+    $("lookupBtn").disabled = false; $("lookupState").textContent = "Lookup failed"; $("srcStatus").innerHTML = `<span class="src bad">${esc(connError(err))}</span>`;
+  });
+}
+function numberChanged(){
+  const s = setInfo();
+  if(s.raw === lastLooked) return;
+  lastLooked = s.raw;
+  clearItemData(); showColors([], ""); refreshLinks(); calc();
+  clearTimeout(lookupTimer); lookupTimer = setTimeout(runLookup, 700);
+}
+$("setNum").addEventListener("input", numberChanged);
+$("itemType").addEventListener("change", ()=>{ lastLooked = ""; numberChanged(); });
+$("partColor").addEventListener("change", runLookup);
+$("setName").addEventListener("input", ()=>{ refreshLinks(); calc(); });
+$("lookup").addEventListener("submit", e=>{ e.preventDefault(); clearTimeout(lookupTimer); lastLooked = setInfo().raw; runLookup(); });
+lastLooked = setInfo().raw;
+
+// ---------- Import owned lists ----------
+function parseCsv(text){
+  const rows = [], re = /("([^"]|"")*"|[^,\t\r\n]*)(,|\t|\r?\n|$)/g;
+  let row = [], m;
+  while((m = re.exec(text)) && m[0] !== ""){
+    let v = m[1]; if(v[0]==='"') v = v.slice(1,-1).replace(/""/g,'"');
+    row.push(v.trim());
+    if(m[3] !== "," && m[3] !== "\t"){ rows.push(row); row = []; }
+  }
+  if(row.length) rows.push(row);
+  return rows.filter(r=>r.some(c=>c!==""));
+}
+// Brickset, Rebrickable, BrickEconomy and our own CSV exports, matched by column name
+function importCsv(text){
+  const rows = parseCsv(text); if(rows.length<2) return [];
+  const head = rows[0].map(h=>h.toLowerCase());
+  const col = re => head.findIndex(h=>re.test(h));
+  const iNum = col(/^(set ?(number|num|#|no)|number|item ?(no|number|id)|part ?(num|number)|fig ?num|minifig ?(num|number)|element ?id|id)$/);
+  const iVar = col(/^variant$/), iName = col(/name/), iQty = col(/qty|quantity|owned|count/);
+  const iCond = col(/condition|new ?or ?used|^cond/), iType = col(/^type$|item ?type/);
+  if(iNum<0) throw new Error("No set or item number column found");
+  return rows.slice(1).map(r=>{
+    let num = r[iNum]||""; if(iVar>=0 && r[iVar] && !/-\d+$/.test(num)) num += "-" + r[iVar];
+    const cond = /used|^u$/i.test(iCond>=0 ? r[iCond] : "") ? "used" : "new";
+    const t = iType>=0 ? (r[iType]||"").toLowerCase() : "";
+    const type = /fig/.test(t) ? "minifig" : /part|element/.test(t) ? "part" : /set/.test(t) ? "set" : detectType(num);
+    return {set: type==="set" ? num.replace(/-1$/,"") : num, name: iName>=0 ? r[iName] : "", qty: Math.max(1, parseInt(iQty>=0 ? r[iQty] : 1)||1), cond, type};
+  }).filter(x=>x.set);
+}
+// BrickLink wanted list / inventory XML
+function importXml(text){
+  const doc = new DOMParser().parseFromString(text, "text/xml");
+  const T = {S:"set", M:"minifig", P:"part"};
+  return [...doc.getElementsByTagName("ITEM")].map(it=>{
+    const g = tag => (it.getElementsByTagName(tag)[0]||{}).textContent || "";
+    const type = T[g("ITEMTYPE").trim()] || "part";
+    const num = g("ITEMID").trim();
+    return {set: type==="set" ? num.replace(/-1$/,"") : num, name:"", qty: Math.max(1, parseInt(g("QTY")||g("MINQTY"))||1),
+      cond: g("CONDITION").trim()==="U" ? "used" : "new", type, color: g("COLOR").trim() ? {id:+g("COLOR").trim(), name:""} : null};
+  }).filter(x=>x.set);
+}
+$("importFile").addEventListener("change", e=>{
+  const f = e.target.files && e.target.files[0]; if(!f) return;
+  const rd = new FileReader();
+  rd.onload = ()=>{
+    try{
+      const text = String(rd.result);
+      const items = /^\s*<|<INVENTORY|<ITEM>/i.test(text) ? importXml(text) : importCsv(text);
+      let added = 0, merged = 0;
+      items.forEach(it=>{
+        const at = owned.findIndex(o=>o.set===it.set && o.cond===it.cond && (o.color&&o.color.id)===(it.color&&it.color.id));
+        if(at>=0){ owned[at].qty = (owned[at].qty||1) + it.qty; merged++; }
+        else { owned.push({...it, newPx:null, usedPx:null, priced:null, snap:null}); added++; }
+      });
+      saveOwned(); renderOwned();
+      $("ownMsg").textContent = `Imported ${items.length} line${items.length===1?"":"s"} from ${f.name}: ${added} new, ${merged} added to existing.` + (api.url ? " Choose Price all with live data to price them." : " Connect live data to price them automatically.");
+    }catch(err){ $("ownMsg").textContent = "Couldn't read that file: " + err.message; }
+    e.target.value = "";
+  };
+  rd.readAsText(f);
+});
+let pricingAll = false;
+$("priceAllBtn").addEventListener("click", async ()=>{
+  if(!api.url){ $("ownMsg").textContent = "Connect live data first (Live data connection, above)."; $("connPanel").open = true; return; }
+  if(pricingAll || !owned.length) return;
+  pricingAll = true; $("priceAllBtn").disabled = true;
+  let done = 0, failed = 0;
+  for(const o of owned){
+    $("ownMsg").textContent = `Pricing ${done+failed+1} of ${owned.length}: ${o.set}…`;
+    try{
+      const r = await apiCall({lookup:o.set, type:o.type||"auto", color:o.color && o.color.id});
+      if(!r.found) throw new Error("not found");
+      const v = valuesFromLookup(r), R = BrickPricing.priceSet(v.engine);
+      o.name = o.name || r.name; o.type = r.type; o.newPx = R.setPrice; o.usedPx = R.usedPrice; o.priced = new Date().toISOString();
+      if(r.color) o.color = r.color;
+      done++;
+    }catch(err){ failed++; }
+    saveOwned(); renderOwned();
+    await new Promise(res=>setTimeout(res, 1100));     // stay under Rebrickable's 1 request/second
+  }
+  $("ownMsg").textContent = `Priced ${done} of ${owned.length}` + (failed ? `; ${failed} couldn't be found or priced.` : ".");
+  pricingAll = false; $("priceAllBtn").disabled = false;
+});
+
+// ---------- Collection sync (Brickset master) ----------
+let syncPlan = null, pushing = false;
+function needApi(){
+  if(api.url) return false;
+  $("syncMsg").textContent = "Connect live data first (Live data connection, above)."; $("connPanel").open = true; return true;
+}
+function copyText(text, okMsg){
+  const fb = $("syncFallback");
+  navigator.clipboard.writeText(text).then(()=>{ $("syncMsg").textContent = okMsg; fb.hidden = true; })
+    .catch(()=>{ fb.value = text; fb.hidden = false; fb.select(); $("syncMsg").textContent = "Select the text below and copy it."; });
+}
+// Merge Brickset's collection into the owned list; Brickset wins on quantities
+function mergeCollection(c){
+  const fromBs = [];
+  (c.sets||[]).forEach(s=>{
+    const base = s.set.replace(/-1$/,"");
+    const nNew = s.qtyNew||0, nUsed = s.qtyUsed||0, rest = Math.max(0, s.qty - nNew - nUsed);
+    if(nNew + rest) fromBs.push({set:base, name:s.name, type:"set", cond:"new", qty:nNew + rest, rrp:s.rrp});
+    if(nUsed) fromBs.push({set:base, name:s.name, type:"set", cond:"used", qty:nUsed, rrp:s.rrp});
+  });
+  (Array.isArray(c.minifigs) ? c.minifigs : []).forEach(f=> fromBs.push({set:f.set, name:f.name, type:"minifig", cond:"new", qty:f.qty}));
+  let added = 0, changed = 0;
+  fromBs.forEach(it=>{
+    const at = owned.findIndex(o=>o.set===it.set && o.cond===it.cond && !(o.color&&o.color.id));
+    if(at>=0){ if(owned[at].qty !== it.qty){ owned[at].qty = it.qty; changed++; } owned[at].name = owned[at].name || it.name; owned[at].fromBrickset = true; }
+    else { owned.push({...it, newPx:null, usedPx:null, priced:null, snap:null, fromBrickset:true}); added++; }
+  });
+  // Sets and minifigs no longer in Brickset are flagged, not deleted
+  const keys = new Set(fromBs.map(it=>it.set+"|"+it.cond));
+  let gone = 0;
+  owned.forEach(o=>{ if((o.type==="set"||o.type==="minifig"||!o.type) && o.fromBrickset && !keys.has(o.set+"|"+o.cond)){ o.notInBrickset = true; gone++; } else if(keys.has(o.set+"|"+o.cond)) delete o.notInBrickset; });
+  saveOwned(); renderOwned();
+  return {added, changed, gone, sets:(c.sets||[]).length, figs:Array.isArray(c.minifigs)?c.minifigs.length:0, figErr: c.minifigs && c.minifigs.error};
+}
+$("pullBtn").addEventListener("click", ()=>{
+  if(needApi()) return;
+  $("syncMsg").textContent = "Reading your Brickset collection…"; $("pullBtn").disabled = true;
+  apiCall({collection:1}).then(c=>{
+    const r = mergeCollection(c);
+    $("syncMsg").textContent = `Brickset: ${r.sets} set${r.sets===1?"":"s"}, ${r.figs} minifig${r.figs===1?"":"s"}. Added ${r.added} line${r.added===1?"":"s"}, updated ${r.changed} quantit${r.changed===1?"y":"ies"}` +
+      (r.gone ? `, ${r.gone} marked as no longer in Brickset` : "") + "." + (r.figErr ? ` Minifigs couldn't be read: ${r.figErr}` : "") + " Choose Price all with live data to price new lines.";
+  }).catch(err=>{ $("syncMsg").textContent = connError(err); }).finally(()=>{ $("pullBtn").disabled = false; });
+});
+function renderPlan(p){
+  syncPlan = p; $("syncOut").hidden = false;
+  const rb = p.rebrickable || {};
+  $("syncStats").innerHTML = `
+    <div class="stat"><span>Brickset (master)</span><b>${p.master.sets}</b><span>${p.master.units} boxes · ${p.master.minifigs} minifigs</span></div>
+    <div class="stat"><span>Rebrickable</span><b>${rb.error ? "–" : rb.inSync ? "In sync" : (rb.add.length + rb.update.length) + " to change"}</b><span>${rb.error ? esc(rb.error) : `${rb.extra.length} not in Brickset`}</span></div>
+    <div class="stat"><span>BrickLink</span><b>XML</b><span>Upload as a wanted list</span></div>
+    <div class="stat"><span>BrickEconomy</span><b>CSV</b><span>No collection API</span></div>`;
+  const rows = [];
+  if(!rb.error){
+    rb.add.forEach(x=>rows.push(`<tr><td><span class="chg add">Add</span></td><td class="num">${esc(x.set)}</td><td class="n">0</td><td class="n">${x.qty}</td></tr>`));
+    rb.update.forEach(x=>rows.push(`<tr><td><span class="chg upd">Change quantity</span></td><td class="num">${esc(x.set)}</td><td class="n">${x.from}</td><td class="n">${x.qty}</td></tr>`));
+    const rm = $("removeExtras").checked;
+    rb.extra.forEach(x=>rows.push(`<tr><td><span class="chg ${rm?"del":"keep"}">${rm?"Remove":"Leave (not in Brickset)"}</span></td><td class="num">${esc(x.set)}</td><td class="n">${x.qty}</td><td class="n">${rm?0:x.qty}</td></tr>`));
+  }
+  $("syncRows").innerHTML = rows.join("") || `<tr><td colspan="4" class="hint">${rb.error ? "Rebrickable couldn't be read." : "Nothing to change."}</td></tr>`;
+  const pending = rb.error ? 0 : rb.add.length + rb.update.length + ($("removeExtras").checked ? rb.extra.length : 0);
+  $("pushBtn").disabled = !pending;
+  $("pushBtn").textContent = pending ? `Push ${pending} change${pending===1?"":"s"} to Rebrickable` : "Rebrickable is up to date";
+}
+$("removeExtras").addEventListener("change", ()=>{ if(syncPlan) renderPlan(syncPlan); });
+$("previewBtn").addEventListener("click", ()=>{
+  if(needApi()) return;
+  $("syncMsg").textContent = "Comparing Brickset with Rebrickable…"; $("previewBtn").disabled = true;
+  apiCall({sync:"preview"}).then(p=>{ renderPlan(p); $("syncMsg").textContent = "Review the changes, then push."; })
+    .catch(err=>{ $("syncMsg").textContent = connError(err); }).finally(()=>{ $("previewBtn").disabled = false; });
+});
+$("pushBtn").addEventListener("click", async ()=>{
+  if(needApi() || pushing || !syncPlan) return;
+  pushing = true; $("pushBtn").disabled = true;
+  let done = 0, failed = [];
+  try{
+    for(let round = 0; round < 20; round++){
+      $("syncMsg").textContent = `Updating Rebrickable… ${done} done so far. This takes about a second per set.`;
+      const body = {action:"apply", removeExtras:$("removeExtras").checked}; if(api.token) body.token = api.token;
+      // text/plain keeps this a simple request that Apps Script accepts from a browser
+      const r = await fetch(api.url, {method:"POST", headers:{"Content-Type":"text/plain;charset=utf-8"}, body:JSON.stringify(body)}).then(x=>x.json());
+      if(r.error) throw new Error(r.error);
+      done += r.done.length; failed = r.failed;
+      if(!r.remaining || !r.done.length) break;      // finished, or nothing more is going through
+    }
+    $("syncMsg").textContent = `Rebrickable updated: ${done} change${done===1?"":"s"}` + (failed.length ? `; ${failed.length} failed (${failed.slice(0,5).map(f=>f.set).join(", ")}${failed.length>5?"…":""}).` : ".");
+    const p = await apiCall({sync:"preview"}); renderPlan(p);
+  }catch(err){ $("syncMsg").textContent = connError(err); }
+  pushing = false;
+});
+$("copyBlXml").addEventListener("click", ()=>{ if(syncPlan) copyText(syncPlan.bricklinkXml, "Copied. On BrickLink, go to Want > Upload and paste it."); });
+$("copyCollCsv").addEventListener("click", ()=>{ if(syncPlan) copyText(syncPlan.csv, "Copied the collection as CSV."); });
+
+// File downloads only work on the GitHub Pages copy; Copy works everywhere
+if(!/github\.io$/.test(location.hostname)) $("dlCsvBtn").hidden = true;
+const savedRate = store.get("bpc.rate"); if(savedRate) $("rate").value = savedRate;
+buildRows(EXAMPLE);
+calc();
+renderOwned();
+</script>
+</body>
+</html>
