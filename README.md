@@ -26,28 +26,30 @@ Minifigs and parts use the recommended price; parts are priced to the cent.
 
 Live lookups run in Google Apps Script, so your API keys stay private and the sites' cross-site limits don't apply.
 
-1. In the CBS Consignment Tracker, open **Extensions > Apps Script**. Paste in [`apps-script/CBS-Pricing-API.gs`](apps-script/CBS-Pricing-API.gs) and save.
-2. Under **Project Settings > Script properties**, add the keys you have. A source without a key is skipped.
+1. In the CBS Consignment Tracker, open **Extensions > Apps Script**. Delete everything in `Code.gs`, paste in all of [`apps-script/CBS-Pricing-API.gs`](apps-script/CBS-Pricing-API.gs), and save. It must be this tracker's own script: `?set=` and `?all=` read its Pricing tab.
+2. Under **Project Settings (gear) > Script properties**, add these, spelled exactly as shown. A source without a key is skipped.
 
    | Property | Where to get it |
    | --- | --- |
+   | `API_TOKEN` | **Required.** Any long password you make up. The app sends it with every request. |
    | `REBRICKABLE_API_KEY` | rebrickable.com > Settings > API (free) |
    | `BRICKSET_API_KEY` | brickset.com/tools/webservices/requestkey (free) |
-   | `BRICKLINK_CONSUMER_KEY`, `BRICKLINK_CONSUMER_SECRET`, `BRICKLINK_TOKEN`, `BRICKLINK_TOKEN_SECRET` | bricklink.com > My BrickLink > API. When creating the access token, use IP `0.0.0.0` so Google's servers can use it. |
+   | `BRICKLINK_CONSUMER_KEY`, `BRICKLINK_CONSUMER_SECRET`, `BRICKLINK_TOKEN`, `BRICKLINK_TOKEN_SECRET` | bricklink.com > My BrickLink > API. For the access token's IP, try `0.0.0.0` (any IP) so Google's servers can use it. |
    | `BRICKECONOMY_API_KEY` | BrickEconomy Premium > API |
-   | `API_TOKEN` | Optional: any password you choose. Requests must then include it. |
+   | `BRICKSET_USERNAME`, `BRICKSET_PASSWORD` | Your Brickset sign-in, for collection sync |
+   | `REBRICKABLE_USERNAME`, `REBRICKABLE_PASSWORD` | Your Rebrickable sign-in, for collection sync |
 
-3. Choose **Deploy > New deployment > Web app**, set **Execute as: Me**, and pick who has access. Copy the `/exec` URL.
-4. In the app, open **Live data connection**, paste the URL (and token), then choose **Save and test**.
+   Don't add `BRICKSET_USER_HASH` or `REBRICKABLE_USER_TOKEN`; the script saves those itself after it signs in. Anyone you give **edit** access to the tracker can see these properties, passwords included.
+
+3. Choose **Deploy > New deployment**, type **Web app**, **Execute as: Me**, **Who has access: Anyone**. "Anyone" is required: the app calls the script from your browser without your Google sign-in, so other settings make every lookup fail. `API_TOKEN` is what keeps it private.
+4. Choose **Authorize access** and allow it. The script needs to read the tracker and connect to the four sites. Copy the **Web app URL** (ends in `/exec`).
+5. In the app, open **Live data connection**, paste the URL and your `API_TOKEN`, then choose **Save and test**. It lists each site as `ready` or `no key`.
+
+After changing the script later, use **Deploy > Manage deployments > Edit > Version: New version**. The `/exec` URL keeps running the old code until you do.
 
 ## Collection sync (Brickset is the master)
 
-Add these Script properties too:
-
-| Property | Used for |
-| --- | --- |
-| `BRICKSET_USERNAME`, `BRICKSET_PASSWORD` | Reading your Brickset collection (it is never changed) |
-| `REBRICKABLE_USERNAME`, `REBRICKABLE_PASSWORD` (or `REBRICKABLE_USER_TOKEN`) | Reading and updating your Rebrickable sets |
+Uses the Brickset and Rebrickable sign-ins from step 2.
 
 In the app, under **Owned sets**:
 
@@ -91,6 +93,6 @@ Rules as JSON: https://drseussfreak.github.io/brick-price-check/api/rules.json
 | `?status=1` | Which sources have keys |
 | `?rules=1` | The pricing rules |
 
-Choose web app access carefully. With "Anyone", anyone who has the URL can read your Pricing tab and use your API quotas, so set `API_TOKEN` too.
+Every request except `?rules=1` is refused without your `API_TOKEN`, so the "Anyone" deployment is safe as long as the token stays private.
 
 Catalog and price data belong to BrickLink, Brickset, BrickEconomy and Rebrickable; each lookup links back to its source.
