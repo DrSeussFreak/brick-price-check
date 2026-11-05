@@ -337,10 +337,10 @@ function priceFromSheet_(setNum) {
  *                              bricklink.com > My BrickLink > API (needs a BrickLink account; register IP 0.0.0.0
  *                              for the token so Google's servers can use it)
  *   BRICKECONOMY_API_KEY       BrickEconomy Premium > API
- *   API_TOKEN                  required: every request must include &token=<same value>
+ *   GOOGLE_CLIENT_ID, ALLOWED_EMAILS   Sign in with Google (see README); or API_TOKEN before that
  * Any source without a key is skipped and reported as "no key".
  *
- * Requests (add &token=... if API_TOKEN is set):
+ * Requests (need a Google sign-in, &id_token=..., or &token=... before that is set up):
  *   ?lookup=75192                 auto-detects set, minifig, part or LEGO element
  *   ?lookup=sw0001&type=minifig   type = set | minifig | part | element
  *   ?lookup=3001&type=part&color=5    part in a BrickLink color id
@@ -359,7 +359,7 @@ function sourceStatus_() {
     brickset: prop_("BRICKSET_API_KEY") ? "ready" : "no key",
     bricklink: hasBrickLink_() ? "ready" : "no key",
     brickeconomy: prop_("BRICKECONOMY_API_KEY") ? "ready" : "no key",
-    tokenRequired: !!prop_("API_TOKEN")
+    signIn: prop_("GOOGLE_CLIENT_ID") ? "google" : "token"
   };
 }
 
@@ -610,10 +610,8 @@ function lookupElement_(q) {
   return r;
 }
 
-/* Route lookups through doGet: call this first inside doGet (see CBS-Pricing-API.gs). */
+/* Route lookups through doGet. doGet has already checked the sign-in (authorize_) before calling this. */
 function lookupRoute_(q) {
-  var need = prop_("API_TOKEN");
-  if ((q.lookup || q.colors || q.status) && need && q.token !== need) return { error: "Wrong or missing token" };
   if (q.status) return sourceStatus_();
   if (q.colors) return blColors_();
   if (q.lookup) return lookup_(q.lookup, q.type, q.color, q.debug);
