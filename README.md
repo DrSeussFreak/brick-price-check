@@ -1,6 +1,6 @@
 # DrSeussFreak's Brick Checker
 
-Look up any LEGO set, minifigure, part or element by number. Price it new and used with consignment pricing rules, and keep a list of what you own.
+Look up any LEGO set, minifigure, part or element by number. Price it new and used from live market data, and keep a list of what you own.
 
 **Use it:** https://drseussfreak.github.io/brick-price-check/
 

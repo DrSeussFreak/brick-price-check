@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Figtree:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
 <style>
-/* Layout: set details on top; price sources (left) feed a sticky shelf-tag card (right) that applies the consignment rules; stacks on phones */
+/* Layout: set details on top; price sources (left) feed a sticky shelf-tag card (right) that applies the pricing rules; stacks on phones */
 :root{
   --bg:#f1f5ee; --surface:#ffffff; --sunk:#e6ece2; --line:#cdd8c6;
   --fg:#18202c; --muted:#5b6678;
@@ -48,9 +48,7 @@ a{color:var(--link)}
 
 header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px}
 header p{margin:6px 0 0;color:var(--muted);max-width:62ch}
-.studs{display:inline-flex;gap:5px;margin-right:10px;vertical-align:middle}
-.studs i{width:12px;height:12px;border-radius:50%;background:var(--accent);box-shadow:inset 0 -2px 0 rgba(0,0,0,.18)}
-.studs i:nth-child(2){background:var(--pink)} .studs i:nth-child(3){background:var(--yellow)} .studs i:nth-child(4){background:var(--brown)}
+.splitbox summary{cursor:pointer;margin-bottom:6px}
 .brand{display:flex;align-items:center;gap:14px}
 .logo{width:84px;height:84px;object-fit:contain;flex:none;background:#fff;border-radius:14px;padding:4px;border:1px solid var(--line)}
 .example{display:inline-block;font-size:12px;font-weight:600;color:var(--accent-ink);background:var(--accent);padding:3px 9px;border-radius:99px}
@@ -178,11 +176,11 @@ td input{width:110px;padding:7px 8px}
     <img class="logo" src="logo.jpg" alt="" onerror="this.remove()">
     <div>
       <div class="eyebrow">DrSeussFreak · LEGO pricing</div>
-      <h1><span class="studs" aria-hidden="true"><i></i><i></i><i></i><i></i></span>DrSeussFreak&#39;s Brick Checker</h1>
-      <p>Prices a set the same way as the Pricing tab in your tracker: average of four sites, never below retail, shelf price from the LR Suggested Price rounded to $5, then any condition discount.</p>
+      <h1>DrSeussFreak&#39;s Brick Checker</h1>
+      <p>Look up any LEGO set, minifigure or part and price it from live market data: BrickEconomy (the same figure DasBot&#39;s !price shows), BrickLink, Brickset and Brick Owl. Never below retail unless you apply a condition discount.</p>
     </div>
     </div>
-    <span class="example" id="exampleBadge">Example: 42127 from your tracker</span>
+    <span class="example" id="exampleBadge">Example: 42127</span>
   </header>
 
   <form class="lookup" id="lookup" autocomplete="off">
@@ -213,7 +211,7 @@ td input{width:110px;padding:7px 8px}
     <div class="itemtext">
       <div class="eyebrow" id="itemKind">Set</div>
       <b id="itemName">The Batman - Batmobile</b>
-      <span class="hint" id="itemMeta">Example row from your tracker</span>
+      <span class="hint" id="itemMeta">Example</span>
       <div class="srcs" id="srcStatus"></div>
     </div>
     <span class="lkstate" id="lookupState"></span>
@@ -222,7 +220,7 @@ td input{width:110px;padding:7px 8px}
   <details class="panel conn" id="connPanel">
     <summary><b>Live data connection</b> <span class="hint" id="connSummary">Not connected. Prices are typed in by hand.</span></summary>
     <div class="connbody">
-      <p class="hint">Live lookups use the Pricing API in your tracker (Google Apps Script), which holds your BrickLink, Brickset, BrickEconomy and Rebrickable keys. Paste its web app URL here. Saved in this browser only.</p>
+      <p class="hint">Live lookups use your Pricing API (Google Apps Script), which holds your BrickLink, Brickset, BrickEconomy and Rebrickable keys. Paste its web app URL here. Saved in this browser only.</p>
       <div style="display:grid;grid-template-columns:minmax(0,3fr) minmax(0,1fr) auto;gap:10px;align-items:end">
         <label>Web app URL<input id="apiUrl" placeholder="https://script.google.com/macros/s/…/exec"></label>
         <label>Token (if set)<input id="apiToken" type="password" placeholder="optional"></label>
@@ -237,7 +235,7 @@ td input{width:110px;padding:7px 8px}
       <section class="panel">
         <div class="panel-head">
           <h2>Your four price sites</h2>
-          <p class="hint">New figures make the Avg market value. Used figures price a used copy. Leave a box blank if that site has no sales, as the tracker does.</p>
+          <p class="hint">New figures make the Avg market value. Used figures price a used copy. Leave a box blank if that site has no sales.</p>
         </div>
         <div class="tbl"><table>
           <thead><tr><th>Site</th><th>Use</th><th>New $</th><th>Used $</th></tr></thead>
@@ -329,7 +327,8 @@ td input{width:110px;padding:7px 8px}
         <p class="hint" id="addMsg"></p>
       </div>
 
-      <div>
+      <details class="splitbox">
+        <summary class="eyebrow">Consignment split (optional)</summary>
         <div class="eyebrow" style="margin-bottom:6px">Consignment split · store keeps <input id="rate" class="num" type="number" min="0" max="100" step="0.5" value="35" style="width:62px;padding:3px 6px;display:inline-block" aria-label="Store consignment rate percent">%</div>
         <div class="split">
           <div><span>Sale price</span><b id="spSale">–</b></div>
@@ -341,12 +340,12 @@ td input{width:110px;padding:7px 8px}
           <div><span>Consignor</span><b id="mdCons">–</b></div>
           <div><span>Store</span><b id="mdCbs">–</b></div>
         </div>
-      </div>
+      </details>
 
       <p class="warn" id="checkNote" hidden></p>
 
       <div class="copyrow">
-        <button type="button" class="primary" id="copyBtn">Copy for the tracker</button>
+        <button type="button" class="primary" id="copyBtn">Copy price summary</button>
       </div>
       <div id="copied"></div>
       <textarea id="copyFallback" hidden readonly rows="4" style="width:100%;font:13px var(--mono);background:var(--sunk);color:var(--fg);border:1px solid var(--line);border-radius:7px;padding:8px"></textarea>
@@ -354,7 +353,6 @@ td input{width:110px;padding:7px 8px}
       <ul class="rules">
         <li><b>Never below retail</b> (or initial cost, if higher) unless a condition discount is applied.</li>
         <li><b>Discounts</b> come off the normal price and may take a damaged set below retail.</li>
-        <li><b>Member/employee 5%:</b> split 65/35 on the discounted price.</li>
         <li><b>Used price</b> is the average of the used figures you enter, rounded to $1. Used counts as a condition discount, so it isn't held to retail.</li>
       </ul>
     </aside>
@@ -509,7 +507,7 @@ function calc(){
   $("avgMeta").textContent = R.sourcesInAverage ? `${R.sourcesInAverage} source${R.sourcesInAverage>1?"s":""}, range ${money(R.sourceRange[0])}–${money(R.sourceRange[1])}` : "Enter at least one site";
 
   const lrSrc = {dasbot:"DasBot !price", brickeconomy:"BrickEconomy value, same as DasBot", retail:"retail", estimate:"estimate from BL3 and BL6; no BrickEconomy value or retail"}[R.lrSource];
-  $("lrNote").textContent = lr==null ? "No LR price yet. The shelf price falls back to the recommended price, as the tracker does."
+  $("lrNote").textContent = lr==null ? "No LR price yet. The shelf price falls back to the recommended price."
     : `Using ${money(lr)} (${lrSrc}).` + (R.lrSource==="brickeconomy" ? " DasBot may differ by a few cents if BrickEconomy has moved since." : R.lrSource==="estimate" ? " This is an estimate; DasBot's own number may differ." : "");
 
   const s4m = R.normalSource==="lr" ? `LR ${money(lr)} rounded to $5`
