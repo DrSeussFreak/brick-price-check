@@ -19,7 +19,7 @@
   "use strict";
 
   var RULES = {
-    version: "1.2.0",
+    version: "1.3.0",
     consignmentRate: 0.35,          // CBS keeps this share; consignor gets the rest
     memberDiscount: 0.05,           // member / employee discount, split on the discounted price
     shelfRounding: 5,               // LR Suggested Price is rounded to the nearest $5
@@ -36,6 +36,7 @@
       "Price floor = retail (Brickset RRP) or initial cost, whichever is higher.",
       "Recommended price = average, never below the floor, in whole dollars.",
       "Normal shelf price = LR Suggested Price rounded to the nearest $5, never below the floor. With no LR price, the recommended price.",
+      "LR Suggested Price = DasBot !price when entered; otherwise the BrickEconomy new value (what DasBot shows), or retail when BrickEconomy has none.",
       "A set is never priced below retail unless a condition discount is applied.",
       "Condition discount comes off the normal shelf price and may take a damaged set below retail.",
       "Used price = average of the used figures, rounded to $1. Used is a condition discount, so it is not held to retail.",
@@ -98,8 +99,12 @@
     // The LR price and $5 rounding are set rules; minifigs and parts use the recommended price
     var isSet = !input.itemType || input.itemType === "set";
     var lr = isSet ? num(input.lr) : null, lrSource = lr !== null ? "dasbot" : null;
+    // Without a DasBot number, copy what DasBot does: BrickEconomy value, else retail
     if (lr === null && isSet) {
-      if (input.stillAtRetail && rrp) { lr = rrp; lrSource = "retail"; }
+      var be = num(nw.brickeconomy);
+      if (input.stillAtRetail && rrp) { lr = rrp; lrSource = "retail"; }   // you ticked "LEGO still sells this set"
+      else if (be !== null) { lr = be; lrSource = "brickeconomy"; }
+      else if (rrp) { lr = rrp; lrSource = "retail"; }
       else {
         var parts = pick(nw, RULES.lrEstimateSources);
         if (parts.length) { lr = round2(mean(parts)); lrSource = "estimate"; }
@@ -136,7 +141,7 @@
       priceFloor: floor,
       recommendedPrice: recommended,
       lrSuggestedPrice: lr,
-      lrSource: lrSource,                 // "dasbot" | "retail" | "estimate" | null
+      lrSource: lrSource,                 // "dasbot" | "brickeconomy" | "retail" | "estimate" | null
       normalShelfPrice: normal,
       normalSource: normalSource,         // "lr" | "floor" | "recommended" | null
       discountPct: discountPct,
