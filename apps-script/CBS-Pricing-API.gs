@@ -233,10 +233,9 @@ function doGet(e) {
   var q = (e && e.parameter) || {};
   var out;
   try {
-    var need = PropertiesService.getScriptProperties().getProperty("API_TOKEN");
-    if (!need && !q.rules) throw new Error("Set API_TOKEN in Script properties first; the web app refuses requests until it has one");
-    if (q.token !== need && !q.rules) throw new Error("Wrong or missing token");
-    var live = lookupRoute_(q) || syncRoute_(q);
+    if (q.config) return json_({ signIn: !!prop_("GOOGLE_CLIENT_ID"), googleClientId: prop_("GOOGLE_CLIENT_ID") || null });
+    if (!q.rules) authorize_({ idToken: q.id_token, token: q.token });
+    var live = q.rules ? null : (lookupRoute_(q) || syncRoute_(q));
     if (live) out = live;
     else if (q.rules) out = BrickPricing.RULES;
     else if (q.set) out = priceFromSheet_(String(q.set).trim());
@@ -245,7 +244,44 @@ function doGet(e) {
   } catch (err) {
     out = { error: String(err && err.message || err) };
   }
-  return ContentService.createTextOutput(JSON.stringify(out, null, 2)).setMimeType(ContentService.MimeType.JSON);
+  return json_(out);
+}
+function json_(o) { return ContentService.createTextOutput(JSON.stringify(o, null, 2)).setMimeType(ContentService.MimeType.JSON); }
+
+/* ---------- Who may use the web app ----------
+ * With GOOGLE_CLIENT_ID set: only "Sign in with Google" from an address in ALLOWED_EMAILS works.
+ *   Your Google account's passkey, 2-Step Verification and password protect it; the token is ignored.
+ * Without it: API_TOKEN, as before.
+ * ?config=1 and ?rules=1 need no sign-in; they hold nothing private.
+ */
+function authorize_(cred) {
+  if (prop_("GOOGLE_CLIENT_ID")) return checkGoogle_(cred.idToken);
+  var need = prop_("API_TOKEN");
+  if (!need) throw new Error("Set GOOGLE_CLIENT_ID (or API_TOKEN) in Script properties first; the web app refuses requests until then");
+  if (cred.token !== need) throw new Error("Wrong or missing token");
+  return "token";
+}
+function checkGoogle_(idToken) {
+  if (!idToken) throw new Error("Sign in with Google first");
+  var allowed = String(prop_("ALLOWED_EMAILS")).toLowerCase().split(/[\s,;]+/).filter(String);
+  if (!allowed.length) throw new Error("Set ALLOWED_EMAILS in Script properties (your Google address)");
+  var cache = CacheService.getScriptCache();
+  var key = "gid_" + Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, idToken)).slice(0, 43);
+  var known = cache.get(key);
+  if (known && allowed.indexOf(known) >= 0) return known;
+  // Google checks the signature and expiry; we check it was made for this app and for you
+  var r = UrlFetchApp.fetch("https://oauth2.googleapis.com/tokeninfo?id_token=" + encodeURIComponent(idToken), { muteHttpExceptions: true });
+  var c; try { c = JSON.parse(r.getContentText()); } catch (e) { c = {}; }
+  if (r.getResponseCode() !== 200 || !c.email) throw new Error("Google sign-in expired; sign in again");
+  if (c.aud !== prop_("GOOGLE_CLIENT_ID")) throw new Error("That Google sign-in was made for a different app");
+  if (c.iss !== "accounts.google.com" && c.iss !== "https://accounts.google.com") throw new Error("That sign-in did not come from Google");
+  if (String(c.email_verified) !== "true") throw new Error("Google has not verified that email address");
+  var email = String(c.email).toLowerCase();
+  if (allowed.indexOf(email) < 0) throw new Error(email + " is not allowed to use this web app");
+  var left = Math.min(21600, Number(c.exp) - Math.floor(Date.now() / 1000));
+  if (!(left > 0)) throw new Error("Google sign-in expired; sign in again");
+  cache.put(key, email, Math.max(1, left - 30));
+  return email;
 }
 
 function priceFromParams_(q) {
@@ -599,7 +635,7 @@ function lookupRoute_(q) {
  *                inventory would list items FOR SALE, so it is never touched    -> wanted-list XML to upload
  *   BrickEconomy no collection API confirmed                                    -> CSV export
  *
- * Requests (add &token=... if API_TOKEN is set):
+ * Requests (add &id_token=... from Google sign-in, or &token=... before that is set up):
  *   GET  ?collection=1          your Brickset collection (sets + minifigs)
  *   GET  ?sync=preview          what would change on Rebrickable, plus BrickLink XML and CSV
  *   POST {"action":"apply","removeExtras":false,"token":"..."}   push to Rebrickable (in batches)
@@ -761,9 +797,7 @@ function doPost(e) {
   var out;
   try {
     var body = JSON.parse(e.postData && e.postData.contents || "{}");
-    var need = prop_("API_TOKEN");
-    if (!need) throw new Error("Set API_TOKEN in Script properties first");
-    if (body.token !== need) throw new Error("Wrong or missing token");
+    authorize_({ idToken: body.id_token, token: body.token });
     if (body.action === "apply") out = syncApply_(!!body.removeExtras);
     else throw new Error("Unknown action");
   } catch (err) { out = { error: String(err && err.message || err) }; }
