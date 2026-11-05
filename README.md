@@ -47,6 +47,19 @@ Live lookups run in Google Apps Script, so your API keys stay private and the si
 
 After changing the script later, use **Deploy > Manage deployments > Edit > Version: New version**. The `/exec` URL keeps running the old code until you do.
 
+## Sign in with Google (recommended)
+
+Locks the web app to your Google account, so your passkey, 2-Step Verification and password protect your data. Nobody else can use it, even with the URL.
+
+1. Go to [console.cloud.google.com](https://console.cloud.google.com/), create a project (any name), then open **APIs & Services > OAuth consent screen** and set it up: External, app name, your email. You don't need to add any scopes.
+2. Open **APIs & Services > Credentials > Create credentials > OAuth client ID**. Pick **Web application**. Under **Authorized JavaScript origins**, add `https://drseussfreak.github.io`. Create it and copy the **Client ID** (it ends in `.apps.googleusercontent.com`).
+3. In the tracker's Apps Script, add two Script properties:
+   - `GOOGLE_CLIENT_ID`: the Client ID
+   - `ALLOWED_EMAILS`: your Google address (separate several with commas)
+4. Reload the app and choose **Sign in with Google** in **Live data connection**. A sign-in lasts about an hour, and the app asks again when it runs out.
+
+Once `GOOGLE_CLIENT_ID` is set, `API_TOKEN` is ignored. The only requests that work without signing in are `?rules=1` and `?config=1`, and neither holds anything private.
+
 ## Collection sync (Brickset is the master)
 
 Uses the Brickset and Rebrickable sign-ins from step 2.
@@ -93,6 +106,6 @@ Rules as JSON: https://drseussfreak.github.io/brick-price-check/api/rules.json
 | `?status=1` | Which sources have keys |
 | `?rules=1` | The pricing rules |
 
-Every request except `?rules=1` is refused without your `API_TOKEN`, so the "Anyone" deployment is safe as long as the token stays private.
+Every request except `?rules=1` and `?config=1` is refused unless you are signed in with Google (or, before that is set up, send your `API_TOKEN`). That is why the "Anyone" deployment is safe.
 
 Catalog and price data belong to BrickLink, Brickset, BrickEconomy and Rebrickable; each lookup links back to its source.

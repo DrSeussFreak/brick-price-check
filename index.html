@@ -128,6 +128,7 @@ td input{width:110px;padding:7px 8px}
 .conn{padding:12px 18px}
 .conn summary{cursor:pointer;display:flex;flex-wrap:wrap;gap:10px;align-items:baseline}
 .connbody{display:grid;gap:10px;margin-top:12px}
+.gsi{display:flex;flex-wrap:wrap;align-items:center;gap:12px;min-height:44px}
 .filled{box-shadow:inset 0 0 0 1px var(--good)}
 .syncbox{display:grid;gap:10px;border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:14px;background:var(--sunk)}
 .syncbox .stat{background:var(--surface)}
@@ -220,11 +221,16 @@ td input{width:110px;padding:7px 8px}
   <details class="panel conn" id="connPanel">
     <summary><b>Live data connection</b> <span class="hint" id="connSummary">Not connected. Prices are typed in by hand.</span></summary>
     <div class="connbody">
-      <p class="hint">Live lookups use your Pricing API (Google Apps Script), which holds your BrickLink, Brickset, BrickEconomy and Rebrickable keys. Paste its web app URL here. Saved in this browser only.</p>
+      <p class="hint">Live lookups use your Pricing API (Google Apps Script), which holds your BrickLink, Brickset, BrickEconomy and Rebrickable keys. Paste its web app URL here. Once Google sign-in is set up on the web app, only your Google account can use it. Saved in this browser only.</p>
       <div style="display:grid;grid-template-columns:minmax(0,3fr) minmax(0,1fr) auto;gap:10px;align-items:end">
         <label>Web app URL<input id="apiUrl" placeholder="https://script.google.com/macros/s/…/exec"></label>
-        <label>Token (if set)<input id="apiToken" type="password" placeholder="optional"></label>
+        <label id="tokenWrap">Token<input id="apiToken" type="password" placeholder="API_TOKEN"></label>
         <button type="button" id="testConn">Save and test</button>
+      </div>
+      <div class="gsi" id="gsiBox" hidden>
+        <div id="gsiBtn"></div>
+        <span class="hint" id="gsiWho"></span>
+        <button type="button" id="signOut" hidden>Sign out</button>
       </div>
       <p class="hint" id="connMsg"></p>
     </div>
@@ -697,21 +703,84 @@ let lookupSeq = 0, lookupTimer = null, lastLooked = "";
 function apiCall(params){
   const u = new URL(api.url);
   Object.entries(params).forEach(([k,v])=>{ if(v!==undefined && v!==null && v!=="") u.searchParams.set(k, v); });
-  if(api.token) u.searchParams.set("token", api.token);
-  return fetch(u.toString()).then(r=>r.json()).then(j=>{ if(j && j.error) throw new Error(j.error); return j; });
+  if(google_.on) { if(google_.token) u.searchParams.set("id_token", google_.token); }
+  else if(api.token) u.searchParams.set("token", api.token);
+  return fetch(u.toString()).then(r=>r.json()).then(j=>{
+    if(j && j.error){ if(/sign in/i.test(j.error)) needSignIn(); throw new Error(j.error); }
+    return j;
+  });
 }
+
+// ---------- Sign in with Google ----------
+// When the web app has GOOGLE_CLIENT_ID set, only your Google account gets in
+// (with its passkey / 2-Step Verification). The sign-in lasts about an hour and is
+// kept for this tab only.
+const google_ = { on:false, clientId:"", token:"", email:"", exp:0, loaded:null };
+const sess = { get(k){try{return sessionStorage.getItem(k);}catch(e){return null;}}, set(k,v){try{ v==null ? sessionStorage.removeItem(k) : sessionStorage.setItem(k,v);}catch(e){}} };
+function jwtClaims(t){ try{ const p=t.split(".")[1].replace(/-/g,"+").replace(/_/g,"/"); return JSON.parse(decodeURIComponent(escape(atob(p)))); }catch(e){ return {}; } }
+function setGoogleToken(t){
+  const c = t ? jwtClaims(t) : {};
+  if(t && !(c.exp*1000 > Date.now()+60000)) t = "";       // expired or about to
+  google_.token = t || ""; google_.email = t ? (c.email||"") : ""; google_.exp = t ? c.exp*1000 : 0;
+  sess.set("bpc.gid", t || null);
+  $("gsiWho").textContent = t ? `Signed in as ${google_.email}` : "Sign in to use live data. Only your Google account is allowed.";
+  $("signOut").hidden = !t; $("gsiBtn").hidden = !!t;
+}
+function needSignIn(){
+  setGoogleToken("");
+  $("connPanel").open = true;
+  if(window.google && google.accounts) google.accounts.id.prompt();
+}
+function loadGsi(){
+  if(google_.loaded) return google_.loaded;
+  google_.loaded = new Promise((ok, bad)=>{
+    const s = document.createElement("script");
+    s.src = "https://accounts.google.com/gsi/client"; s.async = true;
+    s.onload = ok; s.onerror = ()=>bad(new Error("Couldn't load Google sign-in"));
+    document.head.appendChild(s);
+  });
+  return google_.loaded;
+}
+async function initGoogle(){
+  google_.on = false; $("gsiBox").hidden = true; $("tokenWrap").hidden = false;
+  if(!api.url) return;
+  let cfg;
+  try{ cfg = await fetch(new URL("?config=1", api.url).toString()).then(r=>r.json()); }catch(e){ return; }
+  if(!cfg || !cfg.signIn || !cfg.googleClientId) return;   // still on API_TOKEN
+  google_.on = true; google_.clientId = cfg.googleClientId;
+  $("gsiBox").hidden = false; $("tokenWrap").hidden = true;
+  setGoogleToken(sess.get("bpc.gid"));
+  try{ await loadGsi(); }catch(e){ $("gsiWho").textContent = e.message; return; }
+  google.accounts.id.initialize({
+    client_id: google_.clientId,
+    callback: r=>{ setGoogleToken(r.credential); $("connMsg").textContent = ""; connSummary(); },
+    auto_select: true, use_fedcm_for_prompt: true
+  });
+  google.accounts.id.renderButton($("gsiBtn"), {theme:"outline", size:"large", text:"signin_with"});
+  if(!google_.token) google.accounts.id.prompt();
+  connSummary();
+}
+$("signOut").addEventListener("click", ()=>{
+  if(window.google && google.accounts) google.accounts.id.disableAutoSelect();
+  setGoogleToken(""); connSummary();
+});
+setInterval(()=>{ if(google_.token && google_.exp < Date.now()+60000) needSignIn(); }, 60000);
 function connSummary(st){
   if(!api.url){ $("connSummary").textContent = "Not connected. Prices are typed in by hand."; return; }
-  if(!st){ $("connSummary").textContent = "Web app URL saved."; return; }
+  if(google_.on && !google_.token){ $("connSummary").textContent = "Sign in with Google to use live data."; return; }
+  if(!st){ $("connSummary").textContent = google_.on ? `Signed in as ${google_.email}.` : "Web app URL saved."; return; }
   const on = ["bricklink","brickset","brickeconomy","rebrickable"].filter(k=>st[k]==="ready");
   $("connSummary").textContent = on.length ? `Connected: ${on.map(k=>({bricklink:"BrickLink",brickset:"Brickset",brickeconomy:"BrickEconomy",rebrickable:"Rebrickable"}[k])).join(", ")}` : "Connected, but no source keys are set yet.";
 }
 connSummary();
-$("testConn").addEventListener("click", ()=>{
+initGoogle();
+$("testConn").addEventListener("click", async ()=>{
   api.url = $("apiUrl").value.trim(); api.token = $("apiToken").value.trim();
   store.set("bpc.apiUrl", api.url); store.set("bpc.apiToken", api.token);
   if(!api.url){ $("connMsg").textContent = "Saved. Lookups are off until you add a URL."; connSummary(); return; }
   $("connMsg").textContent = "Testing…";
+  if(!google_.clientId || !google_.on) await initGoogle();
+  if(google_.on && !google_.token){ $("connMsg").textContent = "Saved. Sign in with Google to finish."; return; }
   apiCall({status:1}).then(st=>{
     const parts = ["rebrickable","brickset","bricklink","brickeconomy"].map(k=>`${k}: ${st[k]}`);
     $("connMsg").textContent = "Connected. " + parts.join(" · "); connSummary(st);
@@ -967,7 +1036,8 @@ $("pushBtn").addEventListener("click", async ()=>{
   try{
     for(let round = 0; round < 20; round++){
       $("syncMsg").textContent = `Updating Rebrickable… ${done} done so far. This takes about a second per set.`;
-      const body = {action:"apply", removeExtras:$("removeExtras").checked}; if(api.token) body.token = api.token;
+      const body = {action:"apply", removeExtras:$("removeExtras").checked};
+      if(google_.on) body.id_token = google_.token; else if(api.token) body.token = api.token;
       // text/plain keeps this a simple request that Apps Script accepts from a browser
       const r = await fetch(api.url, {method:"POST", headers:{"Content-Type":"text/plain;charset=utf-8"}, body:JSON.stringify(body)}).then(x=>x.json());
       if(r.error) throw new Error(r.error);
