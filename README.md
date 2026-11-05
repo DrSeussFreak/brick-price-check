@@ -15,7 +15,7 @@ Look up any LEGO set, minifigure, part or element by number. Price it new and us
 1. **Avg market value**: the average of Brickset, BrickLink 6-month sold, BrickEconomy and Brick Owl (new).
 2. **Price floor**: retail (Brickset RRP), or the initial cost if that's higher.
 3. **Recommended price**: the average, never below the floor.
-4. **Normal shelf price**: the LR Suggested Price (DasBot `!price` in Lego_Raffles) rounded to $5, never below the floor. If you don't enter one, it's estimated from BrickLink 3-month, BrickLink 6-month and BrickEconomy.
+4. **Normal shelf price**: the LR Suggested Price (DasBot `!price` in Lego_Raffles) rounded to $5, never below the floor. If you don't enter one, the BrickEconomy new value is used (that's what DasBot shows), or retail when BrickEconomy has none.
 5. **Never below retail unless discounted.** Condition discounts: minor dents 5%, major crease 10%, crushed box 15%, box opened with bags sealed 15%.
 6. **Used price**: the average of the used figures, rounded to $1.
 7. **Consignment split**: consignor 65%, CBS 35%. The member/employee 5% is split on the discounted price.

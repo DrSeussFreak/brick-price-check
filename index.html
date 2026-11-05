@@ -252,12 +252,12 @@ td input{width:110px;padding:7px 8px}
       <section class="panel">
         <div class="panel-head">
           <h2>LR Suggested Price</h2>
-          <p class="hint">Run <span class="num">!price <span id="cmdNum">42127</span></span> with DasBot in the Lego_Raffles Discord and enter its recommended price. If you don't have it, the app estimates it the way DasBot describes: from BrickLink 3-month, BrickLink 6-month and BrickEconomy, or retail if LEGO still sells the set.</p>
+          <p class="hint">Run <span class="num">!price <span id="cmdNum">42127</span></span> with DasBot in the Lego_Raffles Discord and enter its recommended price. If you leave it blank, the app uses the BrickEconomy new value, which is what DasBot shows, or retail when BrickEconomy has none.</p>
         </div>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;align-items:end">
           <label>DasBot recommended price<input id="lr" class="num" inputmode="decimal" placeholder="$ from !price" value="140.00"></label>
           <label>BrickLink 3-mo sold avg, new<input id="bl3" class="num" inputmode="decimal" placeholder="$ for estimate"></label>
-          <label class="check"><input type="checkbox" id="atRetail"> LEGO still sells this set</label>
+          <label class="check"><input type="checkbox" id="atRetail"> LEGO still sells this set (use retail)</label>
         </div>
         <p class="hint" id="lrNote" style="margin-top:10px"></p>
       </section>
@@ -508,9 +508,9 @@ function calc(){
   $("avgVal").textContent = money(avg);
   $("avgMeta").textContent = R.sourcesInAverage ? `${R.sourcesInAverage} source${R.sourcesInAverage>1?"s":""}, range ${money(R.sourceRange[0])}–${money(R.sourceRange[1])}` : "Enter at least one site";
 
-  const lrSrc = {dasbot:"DasBot !price", retail:"retail (LEGO still sells it)", estimate:"estimate from BL3, BL6 and BE"}[R.lrSource];
+  const lrSrc = {dasbot:"DasBot !price", brickeconomy:"BrickEconomy value, same as DasBot", retail:"retail", estimate:"estimate from BL3 and BL6; no BrickEconomy value or retail"}[R.lrSource];
   $("lrNote").textContent = lr==null ? "No LR price yet. The shelf price falls back to the recommended price, as the tracker does."
-    : `Using ${money(lr)} (${lrSrc}).` + (R.lrSource==="estimate" ? " This is an estimate; DasBot's own number may differ." : "");
+    : `Using ${money(lr)} (${lrSrc}).` + (R.lrSource==="brickeconomy" ? " DasBot may differ by a few cents if BrickEconomy has moved since." : R.lrSource==="estimate" ? " This is an estimate; DasBot's own number may differ." : "");
 
   const s4m = R.normalSource==="lr" ? `LR ${money(lr)} rounded to $5`
     : R.normalSource==="floor" ? `LR ${money(lr)} rounded to $5, raised to the floor`
