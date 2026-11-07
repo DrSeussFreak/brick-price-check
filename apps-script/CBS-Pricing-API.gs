@@ -234,7 +234,8 @@ function doGet(e) {
   var out;
   try {
     if (q.config) return json_({ signIn: !!prop_("GOOGLE_CLIENT_ID"), googleClientId: prop_("GOOGLE_CLIENT_ID") || null });
-    if (!q.rules) authorize_({ idToken: q.id_token, token: q.token });
+    if (q.session === "start") return json_(startSession_(q.id_token));
+    if (!q.rules) authorize_({ session: q.session, idToken: q.id_token, token: q.token });
     var live = q.rules ? null : (lookupRoute_(q) || syncRoute_(q));
     if (live) out = live;
     else if (q.rules) out = BrickPricing.RULES;
@@ -253,17 +254,48 @@ function json_(o) { return ContentService.createTextOutput(JSON.stringify(o, nul
  *   Your Google account's passkey, 2-Step Verification and password protect it; the token is ignored.
  * Without it: API_TOKEN, as before.
  * ?config=1 and ?rules=1 need no sign-in; they hold nothing private.
+ *
+ * Staying signed in: after a Google sign-in, ?session=start&id_token=... returns a session
+ * signed with SESSION_SECRET (made automatically) that lasts SESSION_DAYS (default 30).
+ * To sign out every device at once, delete SESSION_SECRET in Script properties.
+ * Removing an address from ALLOWED_EMAILS also ends its sessions.
  */
 function authorize_(cred) {
-  if (prop_("GOOGLE_CLIENT_ID")) return checkGoogle_(cred.idToken);
+  if (prop_("GOOGLE_CLIENT_ID")) return cred.session ? checkSession_(cred.session) : checkGoogle_(cred.idToken);
   var need = prop_("API_TOKEN");
   if (!need) throw new Error("Set GOOGLE_CLIENT_ID (or API_TOKEN) in Script properties first; the web app refuses requests until then");
   if (cred.token !== need) throw new Error("Wrong or missing token");
   return "token";
 }
+function allowed_() { return String(prop_("ALLOWED_EMAILS")).toLowerCase().split(/[\s,;]+/).filter(String); }
+function sessionSecret_() {
+  var p = PropertiesService.getScriptProperties(), s = p.getProperty("SESSION_SECRET");
+  if (!s) { s = Utilities.getUuid() + Utilities.getUuid(); p.setProperty("SESSION_SECRET", s); }
+  return s;
+}
+function sign_(payload) { return Utilities.base64EncodeWebSafe(Utilities.computeHmacSha256Signature(payload, sessionSecret_())).replace(/=+$/, ""); }
+function startSession_(idToken) {
+  if (!prop_("GOOGLE_CLIENT_ID")) throw new Error("Google sign-in is not set up on this web app");
+  var email = checkGoogle_(idToken);
+  var days = Math.min(365, Math.max(1, parseInt(prop_("SESSION_DAYS"), 10) || 30));
+  var exp = Math.floor(Date.now() / 1000) + days * 86400;
+  var payload = Utilities.base64EncodeWebSafe(JSON.stringify({ e: email, x: exp })).replace(/=+$/, "");
+  return { session: payload + "." + sign_(payload), email: email, exp: exp };
+}
+function checkSession_(session) {
+  var parts = String(session).split(".");
+  if (parts.length !== 2) throw new Error("Signed out; sign in again");
+  var good = sign_(parts[0]), diff = good.length ^ parts[1].length;
+  for (var i = 0; i < good.length; i++) diff |= good.charCodeAt(i) ^ (parts[1].charCodeAt(i) || 0);
+  if (diff) throw new Error("Signed out; sign in again");
+  var c; try { c = JSON.parse(Utilities.newBlob(Utilities.base64DecodeWebSafe(parts[0] + "==".slice(0, (4 - parts[0].length % 4) % 4))).getDataAsString()); } catch (e) { throw new Error("Signed out; sign in again"); }
+  if (!(c.x > Date.now() / 1000)) throw new Error("Session ended; sign in again");
+  if (allowed_().indexOf(String(c.e).toLowerCase()) < 0) throw new Error("Signed out; sign in again");
+  return c.e;
+}
 function checkGoogle_(idToken) {
   if (!idToken) throw new Error("Sign in with Google first");
-  var allowed = String(prop_("ALLOWED_EMAILS")).toLowerCase().split(/[\s,;]+/).filter(String);
+  var allowed = allowed_();
   if (!allowed.length) throw new Error("Set ALLOWED_EMAILS in Script properties (your Google address)");
   var cache = CacheService.getScriptCache();
   var key = "gid_" + Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, idToken)).slice(0, 43);
@@ -795,7 +827,7 @@ function doPost(e) {
   var out;
   try {
     var body = JSON.parse(e.postData && e.postData.contents || "{}");
-    authorize_({ idToken: body.id_token, token: body.token });
+    authorize_({ session: body.session, idToken: body.id_token, token: body.token });
     if (body.action === "apply") out = syncApply_(!!body.removeExtras);
     else throw new Error("Unknown action");
   } catch (err) { out = { error: String(err && err.message || err) }; }
