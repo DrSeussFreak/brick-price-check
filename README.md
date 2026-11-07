@@ -56,7 +56,11 @@ Locks the web app to your Google account, so your passkey, 2-Step Verification a
 3. In the tracker's Apps Script, add two Script properties:
    - `GOOGLE_CLIENT_ID`: the Client ID
    - `ALLOWED_EMAILS`: your Google address (separate several with commas)
-4. Reload the app and choose **Sign in with Google** in **Live data connection**. A sign-in lasts about an hour, and the app asks again when it runs out.
+4. Reload the app. It opens on a sign-in screen; nothing else shows until you sign in.
+
+**Staying signed in:** with **Stay signed in on this device** ticked, the web app gives that browser a signed session for 30 days (set `SESSION_DAYS` to change it). Unticked, it lasts until the tab closes. **Sign out** (top right) ends it on that device. To sign out everywhere at once, delete `SESSION_SECRET` in Script properties; the script makes a new one, and every old session stops working. Removing an address from `ALLOWED_EMAILS` also ends its sessions.
+
+The sign-in screen hides the app, but the page's code is still public on GitHub Pages. Your data is protected because the web app checks the session on every request.
 
 Once `GOOGLE_CLIENT_ID` is set, `API_TOKEN` is ignored. The only requests that work without signing in are `?rules=1` and `?config=1`, and neither holds anything private.
 

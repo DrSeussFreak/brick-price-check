@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="locked">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -128,6 +128,13 @@ td input{width:110px;padding:7px 8px}
 .conn{padding:12px 18px}
 .conn summary{cursor:pointer;display:flex;flex-wrap:wrap;gap:10px;align-items:baseline}
 .connbody{display:grid;gap:10px;margin-top:12px}
+.locked .wrap{display:none}
+.gate{position:fixed;inset:0;z-index:50;display:grid;place-items:center;padding:16px;background:var(--bg)}
+.gatecard{width:100%;max-width:380px;display:grid;justify-items:center;gap:14px;text-align:center;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:28px 22px}
+.gatetitle{font-size:24px}
+.gatebtn{min-height:44px}
+.acct{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+.acct button{padding:6px 10px;font-size:13px}
 .gsi{display:flex;flex-wrap:wrap;align-items:center;gap:12px;min-height:44px}
 .filled{box-shadow:inset 0 0 0 1px var(--good)}
 .syncbox{display:grid;gap:10px;border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:14px;background:var(--sunk)}
@@ -170,6 +177,16 @@ td input{width:110px;padding:7px 8px}
 </style>
 </head>
 <body>
+<div class="gate" id="gate">
+  <div class="gatecard">
+    <img class="logo" src="logo.jpg" alt="">
+    <h1 class="gatetitle">DrSeussFreak&#39;s Brick Checker</h1>
+    <p class="hint">Private. Sign in with your Google account to continue.</p>
+    <div id="gateBtn" class="gatebtn"></div>
+    <label class="check"><input type="checkbox" id="stayIn" checked> Stay signed in on this device</label>
+    <p class="hint" id="gateMsg" aria-live="polite"></p>
+  </div>
+</div>
 
 <div class="wrap">
   <header>
@@ -181,7 +198,10 @@ td input{width:110px;padding:7px 8px}
       <p>Look up any LEGO set, minifigure or part and price it from live market data: BrickEconomy (the same figure DasBot&#39;s !price shows), BrickLink, Brickset and Brick Owl. Never below retail unless you apply a condition discount.</p>
     </div>
     </div>
-    <span class="example" id="exampleBadge">Example: 42127</span>
+    <div style="display:grid;gap:8px;justify-items:end">
+      <div class="acct" id="acct" hidden><span>Signed in as <b id="whoami"></b></span><button type="button" id="signOut">Sign out</button></div>
+      <span class="example" id="exampleBadge">Example: 42127</span>
+    </div>
   </header>
 
   <form class="lookup" id="lookup" autocomplete="off">
@@ -221,16 +241,10 @@ td input{width:110px;padding:7px 8px}
   <details class="panel conn" id="connPanel">
     <summary><b>Live data connection</b> <span class="hint" id="connSummary">Not connected. Prices are typed in by hand.</span></summary>
     <div class="connbody">
-      <p class="hint">Live lookups use your Pricing API (Google Apps Script), which holds your BrickLink, Brickset, BrickEconomy and Rebrickable keys. Paste its web app URL here. Once Google sign-in is set up on the web app, only your Google account can use it. Saved in this browser only.</p>
-      <div style="display:grid;grid-template-columns:minmax(0,3fr) minmax(0,1fr) auto;gap:10px;align-items:end">
+      <p class="hint">Live lookups use your Pricing API (Google Apps Script), which holds your BrickLink, Brickset, BrickEconomy and Rebrickable keys. It is filled in already; change it only if you redeploy to a new URL. Only your Google account can use it.</p>
+      <div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:end">
         <label>Web app URL<input id="apiUrl" placeholder="https://script.google.com/macros/s/…/exec"></label>
-        <label id="tokenWrap">Token<input id="apiToken" type="password" placeholder="API_TOKEN"></label>
         <button type="button" id="testConn">Save and test</button>
-      </div>
-      <div class="gsi" id="gsiBox" hidden>
-        <div id="gsiBtn"></div>
-        <span class="hint" id="gsiWho"></span>
-        <button type="button" id="signOut" hidden>Sign out</button>
       </div>
       <p class="hint" id="connMsg"></p>
     </div>
@@ -696,91 +710,108 @@ $("dlCsvBtn").addEventListener("click", ()=>{
 
 // ---------- Live lookup ----------
 const TYPE_LABEL = {set:"Set", minifig:"Minifigure", part:"Part", element:"LEGO element"};
-const api = { url: store.get("bpc.apiUrl") || "", token: store.get("bpc.apiToken") || "" };
-$("apiUrl").value = api.url; $("apiToken").value = api.token;
+const api = { url: store.get("bpc.apiUrl") || "" }; try{ localStorage.removeItem("bpc.apiToken"); }catch(e){}
 let lookupSeq = 0, lookupTimer = null, lastLooked = "";
+
+// The page opens only after Google sign-in. Both values below are public: the Client ID
+// names this app to Google, and the web app refuses everything without a sign-in.
+const DEFAULT_API_URL = "https://script.google.com/macros/s/AKfycbxhS_Lhqhh6P9EXLg5DDETxxAt6zfS1LwsJ9ThSrUXgLI4HKWfkWm7vh4pO-zN4tt5k/exec";
+const GOOGLE_CLIENT_ID = "797910032478-qf0scmk81i8floch2p5a6fnvo798sm45.apps.googleusercontent.com";
+if(!api.url) api.url = DEFAULT_API_URL;
+$("apiUrl").value = api.url;
 
 function apiCall(params){
   const u = new URL(api.url);
   Object.entries(params).forEach(([k,v])=>{ if(v!==undefined && v!==null && v!=="") u.searchParams.set(k, v); });
-  if(google_.on) { if(google_.token) u.searchParams.set("id_token", google_.token); }
-  else if(api.token) u.searchParams.set("token", api.token);
+  if(auth.session) u.searchParams.set("session", auth.session);
   return fetch(u.toString()).then(r=>r.json()).then(j=>{
-    if(j && j.error){ if(/sign in/i.test(j.error)) needSignIn(); throw new Error(j.error); }
+    if(j && j.error){ if(/sign in|signed out|session ended/i.test(j.error)) lock(j.error); throw new Error(j.error); }
     return j;
   });
 }
 
-// ---------- Sign in with Google ----------
-// When the web app has GOOGLE_CLIENT_ID set, only your Google account gets in
-// (with its passkey / 2-Step Verification). The sign-in lasts about an hour and is
-// kept for this tab only.
-const google_ = { on:false, clientId:"", token:"", email:"", exp:0, loaded:null };
-const sess = { get(k){try{return sessionStorage.getItem(k);}catch(e){return null;}}, set(k,v){try{ v==null ? sessionStorage.removeItem(k) : sessionStorage.setItem(k,v);}catch(e){}} };
-function jwtClaims(t){ try{ const p=t.split(".")[1].replace(/-/g,"+").replace(/_/g,"/"); return JSON.parse(decodeURIComponent(escape(atob(p)))); }catch(e){ return {}; } }
-function setGoogleToken(t){
-  const c = t ? jwtClaims(t) : {};
-  if(t && !(c.exp*1000 > Date.now()+60000)) t = "";       // expired or about to
-  google_.token = t || ""; google_.email = t ? (c.email||"") : ""; google_.exp = t ? c.exp*1000 : 0;
-  sess.set("bpc.gid", t || null);
-  $("gsiWho").textContent = t ? `Signed in as ${google_.email}` : "Sign in to use live data. Only your Google account is allowed.";
-  $("signOut").hidden = !t; $("gsiBtn").hidden = !!t;
+// ---------- Sign-in gate ----------
+// Google checks it's you (passkey, 2-Step Verification). The web app then gives this
+// device a signed session that lasts 30 days if "Stay signed in" is ticked, or until
+// the tab closes if not. Sign out ends it here.
+const auth = { session:"", email:"", exp:0 };
+const SESSION_KEY = "bpc.session";
+const keep = {
+  get(){ try{ return localStorage.getItem(SESSION_KEY) || sessionStorage.getItem(SESSION_KEY); }catch(e){ return null; } },
+  set(v, stay){ try{ localStorage.removeItem(SESSION_KEY); sessionStorage.removeItem(SESSION_KEY); if(v) (stay ? localStorage : sessionStorage).setItem(SESSION_KEY, v); }catch(e){} }
+};
+function sessionClaims(s){ try{ let p = s.split(".")[0].replace(/-/g,"+").replace(/_/g,"/"); while(p.length % 4) p += "="; return JSON.parse(atob(p)); }catch(e){ return {}; } }
+function useSession(s){
+  const c = s ? sessionClaims(s) : {};
+  if(!s || !(c.x*1000 > Date.now())) return false;
+  auth.session = s; auth.email = c.e || ""; auth.exp = c.x*1000;
+  return true;
 }
-function needSignIn(){
-  setGoogleToken("");
-  $("connPanel").open = true;
-  if(window.google && google.accounts) google.accounts.id.prompt();
+function unlock(){
+  document.documentElement.classList.remove("locked");
+  $("gate").hidden = true;
+  $("whoami").textContent = auth.email; $("acct").hidden = false;
+  connSummary();
 }
+function lock(msg, byUser){
+  auth.session = ""; auth.email = ""; auth.exp = 0; keep.set(null);
+  document.documentElement.classList.add("locked");
+  $("gate").hidden = false; $("acct").hidden = true;
+  $("gateMsg").textContent = msg && !/first/i.test(msg) ? msg : "";
+  startGoogle(!byUser);
+}
+let gsiLoad = null, gsiInit = false;
 function loadGsi(){
-  if(google_.loaded) return google_.loaded;
-  google_.loaded = new Promise((ok, bad)=>{
+  if(gsiLoad) return gsiLoad;
+  gsiLoad = new Promise((ok, bad)=>{
     const s = document.createElement("script");
     s.src = "https://accounts.google.com/gsi/client"; s.async = true;
-    s.onload = ok; s.onerror = ()=>bad(new Error("Couldn't load Google sign-in"));
+    s.onload = ok; s.onerror = ()=>{ gsiLoad = null; bad(new Error("Couldn't load Google sign-in. If a blocker is on, allow accounts.google.com")); };
     document.head.appendChild(s);
   });
-  return google_.loaded;
+  return gsiLoad;
 }
-async function initGoogle(){
-  google_.on = false; $("gsiBox").hidden = true; $("tokenWrap").hidden = false;
-  if(!api.url) return;
-  let cfg;
-  try{ cfg = await fetch(new URL("?config=1", api.url).toString()).then(r=>r.json()); }catch(e){ return; }
-  if(!cfg || !cfg.signIn || !cfg.googleClientId) return;   // still on API_TOKEN
-  google_.on = true; google_.clientId = cfg.googleClientId;
-  $("gsiBox").hidden = false; $("tokenWrap").hidden = true;
-  setGoogleToken(sess.get("bpc.gid"));
-  try{ await loadGsi(); }catch(e){ $("gsiWho").textContent = e.message; return; }
-  google.accounts.id.initialize({
-    client_id: google_.clientId,
-    callback: r=>{ setGoogleToken(r.credential); $("connMsg").textContent = ""; connSummary(); },
-    auto_select: true, use_fedcm_for_prompt: true
-  });
-  google.accounts.id.renderButton($("gsiBtn"), {theme:"outline", size:"large", text:"signin_with"});
-  if(!google_.token) google.accounts.id.prompt();
-  connSummary();
+async function startGoogle(auto){
+  try{ await loadGsi(); }catch(e){ $("gateMsg").textContent = e.message; return; }
+  if(!gsiInit){
+    google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: onGoogle, auto_select: true, use_fedcm_for_prompt: true, itp_support: true });
+    gsiInit = true;
+  }
+  $("gateBtn").innerHTML = "";
+  google.accounts.id.renderButton($("gateBtn"), { theme:"filled_blue", size:"large", text:"signin_with", shape:"pill" });
+  if(auto) google.accounts.id.prompt();
+}
+async function onGoogle(r){
+  $("gateMsg").textContent = "Signing in…";
+  try{
+    const u = new URL(api.url); u.searchParams.set("session", "start"); u.searchParams.set("id_token", r.credential);
+    const j = await fetch(u.toString()).then(x=>x.json());
+    if(j.error) throw new Error(j.error);
+    if(!useSession(j.session)) throw new Error("The web app sent back an unusable session");
+    keep.set(j.session, $("stayIn").checked);
+    $("gateMsg").textContent = ""; unlock();
+    apiCall({status:1}).then(st=>connSummary(st)).catch(()=>{});
+  }catch(e){ $("gateMsg").textContent = connError(e); }
 }
 $("signOut").addEventListener("click", ()=>{
   if(window.google && google.accounts) google.accounts.id.disableAutoSelect();
-  setGoogleToken(""); connSummary();
+  lock("", true);
 });
-setInterval(()=>{ if(google_.token && google_.exp < Date.now()+60000) needSignIn(); }, 60000);
+setInterval(()=>{ if(auth.session && auth.exp < Date.now()) lock("Session ended; sign in again"); }, 60000);
+
 function connSummary(st){
-  if(!api.url){ $("connSummary").textContent = "Not connected. Prices are typed in by hand."; return; }
-  if(google_.on && !google_.token){ $("connSummary").textContent = "Sign in with Google to use live data."; return; }
-  if(!st){ $("connSummary").textContent = google_.on ? `Signed in as ${google_.email}.` : "Web app URL saved."; return; }
+  if(!auth.session){ $("connSummary").textContent = "Signed out."; return; }
+  if(!st){ $("connSummary").textContent = `Signed in as ${auth.email}.`; return; }
   const on = ["bricklink","brickset","brickeconomy","rebrickable"].filter(k=>st[k]==="ready");
   $("connSummary").textContent = on.length ? `Connected: ${on.map(k=>({bricklink:"BrickLink",brickset:"Brickset",brickeconomy:"BrickEconomy",rebrickable:"Rebrickable"}[k])).join(", ")}` : "Connected, but no source keys are set yet.";
 }
-connSummary();
-initGoogle();
-$("testConn").addEventListener("click", async ()=>{
-  api.url = $("apiUrl").value.trim(); api.token = $("apiToken").value.trim();
-  store.set("bpc.apiUrl", api.url); store.set("bpc.apiToken", api.token);
-  if(!api.url){ $("connMsg").textContent = "Saved. Lookups are off until you add a URL."; connSummary(); return; }
+// Open straight away if this device is still signed in; the web app re-checks on every request
+if(useSession(keep.get())){ unlock(); apiCall({status:1}).then(st=>connSummary(st)).catch(()=>{}); }
+else lock("");
+$("testConn").addEventListener("click", ()=>{
+  api.url = $("apiUrl").value.trim() || DEFAULT_API_URL; $("apiUrl").value = api.url;
+  store.set("bpc.apiUrl", api.url);
   $("connMsg").textContent = "Testing…";
-  if(!google_.clientId || !google_.on) await initGoogle();
-  if(google_.on && !google_.token){ $("connMsg").textContent = "Saved. Sign in with Google to finish."; return; }
   apiCall({status:1}).then(st=>{
     const parts = ["rebrickable","brickset","bricklink","brickeconomy"].map(k=>`${k}: ${st[k]}`);
     $("connMsg").textContent = "Connected. " + parts.join(" · "); connSummary(st);
@@ -1037,7 +1068,7 @@ $("pushBtn").addEventListener("click", async ()=>{
     for(let round = 0; round < 20; round++){
       $("syncMsg").textContent = `Updating Rebrickable… ${done} done so far. This takes about a second per set.`;
       const body = {action:"apply", removeExtras:$("removeExtras").checked};
-      if(google_.on) body.id_token = google_.token; else if(api.token) body.token = api.token;
+      body.session = auth.session;
       // text/plain keeps this a simple request that Apps Script accepts from a browser
       const r = await fetch(api.url, {method:"POST", headers:{"Content-Type":"text/plain;charset=utf-8"}, body:JSON.stringify(body)}).then(x=>x.json());
       if(r.error) throw new Error(r.error);
