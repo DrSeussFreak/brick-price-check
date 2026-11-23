@@ -528,7 +528,7 @@ function calc(){
 
   const lrSrc = {dasbot:"DasBot !price", brickeconomy:"BrickEconomy value, same as DasBot", retail:"retail", estimate:"estimate from BL3 and BL6; no BrickEconomy value or retail"}[R.lrSource];
   $("lrNote").textContent = lr==null ? "No LR price yet. The shelf price falls back to the recommended price."
-    : `Using ${money(lr)} (${lrSrc}).` + (R.lrSource==="brickeconomy" ? " DasBot may differ by a few cents if BrickEconomy has moved since." : R.lrSource==="estimate" ? " This is an estimate; DasBot's own number may differ." : "");
+    : `Using ${money(lr)} (${lrSrc}).` + (beProblem && !$("lr").value ? " BrickEconomy is unavailable right now, so this is not DasBot's figure. Check !price or try again later." : R.lrSource==="brickeconomy" ? " DasBot may differ by a few cents if BrickEconomy has moved since." : R.lrSource==="estimate" ? " This is an estimate; DasBot's own number may differ." : "");
 
   const s4m = R.normalSource==="lr" ? `LR ${money(lr)} rounded to $5`
     : R.normalSource==="floor" ? `LR ${money(lr)} rounded to $5, raised to the floor`
@@ -803,8 +803,8 @@ setInterval(()=>{ if(auth.session && auth.exp < Date.now()) lock("Session ended;
 function connSummary(st){
   if(!auth.session){ $("connSummary").textContent = "Signed out."; return; }
   if(!st){ $("connSummary").textContent = `Signed in as ${auth.email}.`; return; }
-  const on = ["bricklink","brickset","brickeconomy","rebrickable"].filter(k=>st[k]==="ready");
-  $("connSummary").textContent = on.length ? `Connected: ${on.map(k=>({bricklink:"BrickLink",brickset:"Brickset",brickeconomy:"BrickEconomy",rebrickable:"Rebrickable"}[k])).join(", ")}` : "Connected, but no source keys are set yet.";
+  const on = ["bricklink","brickset","brickeconomy","brickowl","rebrickable"].filter(k=>st[k]==="ready");
+  $("connSummary").textContent = on.length ? `Connected: ${on.map(k=>({bricklink:"BrickLink",brickset:"Brickset",brickeconomy:"BrickEconomy",brickowl:"Brick Owl",rebrickable:"Rebrickable"}[k])).join(", ")}` : "Connected, but no source keys are set yet.";
 }
 // Open straight away if this device is still signed in; the web app re-checks on every request
 if(useSession(keep.get())){ unlock(); apiCall({status:1}).then(st=>connSummary(st)).catch(()=>{}); }
@@ -814,7 +814,7 @@ $("testConn").addEventListener("click", ()=>{
   store.set("bpc.apiUrl", api.url);
   $("connMsg").textContent = "Testing…";
   apiCall({status:1}).then(st=>{
-    const parts = ["rebrickable","brickset","bricklink","brickeconomy"].map(k=>`${k}: ${st[k]}`);
+    const parts = ["rebrickable","brickset","bricklink","brickeconomy","brickowl"].map(k=>`${k}: ${st[k]}`);
     $("connMsg").textContent = "Connected. " + parts.join(" · "); connSummary(st);
   }).catch(err=>{ $("connMsg").textContent = connError(err); });
 });
@@ -841,13 +841,15 @@ function showColors(list, chosen){
 function setVal(id, v){ const el=$(id); if(v!=null && v!==""){ el.value = v; el.classList.add("filled"); } }
 
 // Turn a lookup result into engine input and form values
+let beProblem = false;
 function valuesFromLookup(r){
-  const bl = (r.prices && r.prices.bricklink) || {}, be = (r.prices && r.prices.brickeconomy) || {};
+  const bl = (r.prices && r.prices.bricklink) || {}, be = (r.prices && r.prices.brickeconomy) || {}, bo = (r.prices && r.prices.brickowl) || {};
+  beProblem = /^(error|rate limited)/.test(String(be.status||""));
   const n = bl.new || {}, u = bl.used || {};
   return {
     name: r.name || "", rrp: r.rrp,
-    p: {bl6: n.avg6, be: be.newValue}, u: {bl6: u.avg6, be: be.usedValue}, bl3: n.avg3,
-    engine: {itemType: r.type, rrp: r.rrp, "new": {bricklink6:n.avg6, bricklink3:n.avg3, brickeconomy:be.newValue}, used:{bricklink6:u.avg6, brickeconomy:be.usedValue}}
+    p: {bl6: n.avg6, be: be.newValue, bo: bo.newValue}, u: {bl6: u.avg6, be: be.usedValue, bo: bo.usedValue}, bl3: n.avg3,
+    engine: {itemType: r.type, rrp: r.rrp, "new": {bricklink6:n.avg6, bricklink3:n.avg3, brickeconomy:be.newValue, brickowl:bo.newValue}, used:{bricklink6:u.avg6, brickeconomy:be.usedValue, brickowl:bo.usedValue}}
   };
 }
 function srcPills(r){
@@ -856,7 +858,7 @@ function srcPills(r){
   add("Rebrickable", r.rebrickable && r.rebrickable.status);
   if(r.type==="set") add("Brickset", st.brickset && st.brickset.status);
   add("BrickLink", st.bricklink && st.bricklink.status);
-  if(r.type==="set"||r.type==="minifig") add("BrickEconomy", st.brickeconomy && st.brickeconomy.status);
+  if(r.type==="set"||r.type==="minifig"){ add("BrickEconomy", st.brickeconomy && st.brickeconomy.status); add("Brick Owl", st.brickowl && st.brickowl.status); }
   return pills.join("");
 }
 

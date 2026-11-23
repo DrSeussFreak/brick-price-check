@@ -35,6 +35,7 @@ Live lookups run in Google Apps Script, so your API keys stay private and the si
    | `REBRICKABLE_API_KEY` | rebrickable.com > Settings > API (free) |
    | `BRICKSET_API_KEY` | brickset.com/tools/webservices/requestkey (free) |
    | `BRICKLINK_CONSUMER_KEY`, `BRICKLINK_CONSUMER_SECRET`, `BRICKLINK_TOKEN`, `BRICKLINK_TOKEN_SECRET` | bricklink.com > My BrickLink > API. For the access token's IP, try `0.0.0.0` (any IP) so Google's servers can use it. |
+   | `BRICKOWL_API_KEY` | Brick Owl API key for sold averages (converted from GBP to USD). |
    | `BRICKECONOMY_API_KEY` | BrickEconomy Premium > API |
    | `BRICKSET_USERNAME`, `BRICKSET_PASSWORD` | Your Brickset sign-in, for collection sync |
    | `REBRICKABLE_USERNAME`, `REBRICKABLE_PASSWORD` | Your Rebrickable sign-in, for collection sync |
