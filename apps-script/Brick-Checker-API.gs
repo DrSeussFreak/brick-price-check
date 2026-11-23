@@ -418,12 +418,17 @@ function sourceStatus_() {
   };
 }
 
-function cached_(key, fn) {
+function cached_(key, fn, keep) {
   var c = CacheService.getScriptCache(), hit = c.get(key);
   if (hit) return JSON.parse(hit);
   var v = fn();
+  if (keep && !keep(v)) return v;       // a failed source is tried again next time
   try { c.put(key, JSON.stringify(v), CACHE_SECONDS); } catch (e) { /* value too large to cache */ }
   return v;
+}
+function noSourceErrors_(r) {
+  var p = (r && r.prices) || {};
+  return !Object.keys(p).some(function (k) { return /^(error|rate limited)/.test(String(p[k] && p[k].status)); });
 }
 
 function fetchJson_(url, opts) {
@@ -494,7 +499,10 @@ function bl_(path, query) {
   var qs = Object.keys(query).map(function (k) { return pct_(k) + "=" + pct_(String(query[k])); });
   qs.push("Authorization=" + encodeURIComponent(JSON.stringify(oauth)));
   var r = fetchJson_(url + "?" + qs.join("&"));
-  if (!r.json) return { status: "error " + r.code };
+  if (!r.json) {
+    var page = String(r.text || "").replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi, " ").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 90);
+    return { status: "error " + r.code + " not JSON: " + page };
+  }
   var meta = r.json.meta || {};
   if (meta.code && meta.code !== 200) return { status: meta.code === 404 ? "not found" : ("error " + meta.code + " " + (meta.description || meta.message || "")) };
   return { status: "ok", data: r.json.data };
@@ -539,9 +547,15 @@ function blColors_() {
 function brickeconomy_(kind, no) {
   var key = prop_("BRICKECONOMY_API_KEY");
   if (!key) return { status: "no key" };
+  var cache = CacheService.getScriptCache();
+  if (cache.get("be:limited")) return { status: "rate limited; try later" };
+  return cached_("be:" + kind + ":" + String(no).toLowerCase(), function () { return beFetch_(kind, no, key); }, function (v) { return v.status === "ok"; });
+}
+function beFetch_(kind, no, key) {
   var r = fetchJson_("https://www.brickeconomy.com/api/v1/" + kind + "/" + encodeURIComponent(no) + "?currency=USD",
     { headers: { "x-apikey": key, Accept: "application/json" } });
   if (r.code === 404) return { status: "not found" };
+  if (r.code === 429) { CacheService.getScriptCache().put("be:limited", "1", 3600); return { status: "rate limited; try later" }; }
   if (r.code !== 200 || !r.json) return { status: "error " + r.code };
   var d = r.json.data || r.json;
   function find(re) {
@@ -582,7 +596,7 @@ function lookup_(raw, type, color, debug) {
     if (type === "minifig") return lookupMinifig_(q);
     if (type === "element") return lookupElement_(q);
     return lookupPart_(q, color);
-  });
+  }, noSourceErrors_);
   res.sourcesStatus = sourceStatus_();
   if (!debug && res.brickeconomy) delete res.brickeconomy.keys;
   return res;
@@ -595,6 +609,7 @@ function lookupSet_(q) {
   var blI = blItem_("SET", full);
   var be = brickeconomy_("set", full);
   var blN = blSold_("SET", full, "N"), blU = blSold_("SET", full, "U");
+  var bo = brickowl_("set", full);
   var d = rb.data || {};
   var found = rb.status === "ok" || bs.status === "ok" || blI.status === "ok" || be.status === "ok";
   return {
@@ -607,6 +622,7 @@ function lookupSet_(q) {
     prices: {
       bricklink: { status: blN.status, new: blN, used: blU },
       brickeconomy: be,
+      brickowl: bo,
       brickset: { status: bs.status, rrp: bs.rrp || null }
     },
     rebrickable: { status: rb.status }
@@ -621,12 +637,13 @@ function lookupMinifig_(q) {
   var blI = blNo ? blItem_("MINIFIG", blNo) : { status: "needs BrickLink id" };
   var blN = blNo ? blSold_("MINIFIG", blNo, "N") : blI, blU = blNo ? blSold_("MINIFIG", blNo, "U") : blI;
   var be = blNo ? brickeconomy_("minifig", blNo) : { status: "needs BrickLink id" };
+  var bo = blNo ? brickowl_("minifig", blNo) : { status: "needs BrickLink id" };
   return {
     found: !!(rbd || blI.status === "ok" || be.status === "ok"), type: "minifig", number: q,
     name: blI.name || (rbd && rbd.name) || be.name || "", year: blI.year || be.year || null,
     pieces: rbd ? rbd.num_parts : null, image: (rbd && rbd.set_img_url) || blI.image || "",
     rrp: null,
-    prices: { bricklink: { status: blN.status, new: blN, used: blU }, brickeconomy: be },
+    prices: { bricklink: { status: blN.status, new: blN, used: blU }, brickeconomy: be, brickowl: bo },
     rebrickable: { status: rb.status, id: rbd ? rbd.set_num : null }
   };
 }
@@ -675,6 +692,33 @@ function owlCall_(method, args) {
   var q = Object.keys(args).map(function (k) { return k + "=" + encodeURIComponent(args[k]); }).join("&");
   var r = fetchJson_("https://api.brickowl.com/v1/catalog/" + method + "?key=" + encodeURIComponent(key) + "&" + q);
   return { status: r.code === 200 ? "ok" : "error " + r.code, data: r.json, text: r.json ? undefined : String(r.text).slice(0, 200) };
+}
+// Brick Owl sold averages in USD: last 6 months, or 2 years when there were no 6-month sales
+function gbpUsd_() {
+  return cached_("fx:gbpusd", function () {
+    var r = fetchJson_("https://api.frankfurter.dev/v1/latest?base=GBP&symbols=USD");
+    var rate = r.json && r.json.rates && parseFloat(r.json.rates.USD);
+    return { rate: rate > 0 ? rate : null };
+  }, function (v) { return !!v.rate; }).rate;
+}
+function brickowl_(kind, no) {
+  if (!prop_("BRICKOWL_API_KEY")) return { status: "no key" };
+  return cached_("bo:" + kind + ":" + String(no).toLowerCase(), function () {
+    var ids = owlCall_("id_lookup", kind === "set" ? { id: no, type: "Set", id_type: "set_number" } : { id: no, type: "Minifigure", id_type: "bl_item_no" });
+    if (ids.status !== "ok") return { status: ids.status };
+    var boid = ids.data && ids.data.boids && ids.data.boids[0];
+    if (!boid) return { status: "not found" };
+    var h = owlCall_("price_history", { boid: boid });
+    if (h.status !== "ok" || !h.data) return { status: h.status === "ok" ? "error no data" : h.status };
+    var fx = gbpUsd_();
+    if (!fx) return { status: "error no exchange rate" };
+    function sold(c) {
+      var six = num_(h.data["6months_average_" + c]), two = num_(h.data["2year_average_" + c]), v = six || two;
+      return { value: v ? Math.round(v * fx * 100) / 100 : null, window: six ? "6 months" : (two ? "2 years" : null) };
+    }
+    var n = sold("new"), u = sold("used");
+    return { status: "ok", boid: boid, newValue: n.value, newWindow: n.window, usedValue: u.value, usedWindow: u.window, gbpUsd: fx };
+  }, function (v) { return v.status === "ok" || v.status === "not found"; });
 }
 function owlCheck_(no) {
   var ids = owlCall_("id_lookup", { id: no, type: "Set", id_type: "set_number" });
