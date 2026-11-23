@@ -353,12 +353,12 @@ td input{width:110px;padding:7px 8px}
         <div class="split">
           <div><span>Sale price</span><b id="spSale">–</b></div>
           <div><span>Consignor</span><b id="spCons">–</b></div>
-          <div><span>Store</span><b id="spCbs">–</b></div>
+          <div><span>Store</span><b id="spStore">–</b></div>
         </div>
         <div class="split" style="margin-top:8px">
           <div><span>With 5% member/employee</span><b id="mdSale">–</b></div>
           <div><span>Consignor</span><b id="mdCons">–</b></div>
-          <div><span>Store</span><b id="mdCbs">–</b></div>
+          <div><span>Store</span><b id="mdStore">–</b></div>
         </div>
       </details>
 
@@ -546,8 +546,8 @@ function calc(){
   $("finalWhy").textContent = normal==null ? "Enter site prices or retail to begin."
     : pct>0 ? `${money(normal,false)} normal price, ${pct}% off${reason?` for ${reason.toLowerCase()}`:""}` : `Normal shelf price, no condition discount`;
 
-  $("spSale").textContent=money(R.split.price); $("spCons").textContent=money(R.split.consignor); $("spCbs").textContent=money(R.split.cbs);
-  $("mdSale").textContent=money(R.memberSplit.price); $("mdCons").textContent=money(R.memberSplit.consignor); $("mdCbs").textContent=money(R.memberSplit.cbs);
+  $("spSale").textContent=money(R.split.price); $("spCons").textContent=money(R.split.consignor); $("spStore").textContent=money(R.split.store);
+  $("mdSale").textContent=money(R.memberSplit.price); $("mdCons").textContent=money(R.memberSplit.consignor); $("mdStore").textContent=money(R.memberSplit.store);
 
   const usedCoreN = CORE.filter(c=>parse($("u_"+c.id).value)!=null).length;
   $("usedAvgVal").textContent = money(usedCoreN ? R.usedAvgMarketValue : null);
@@ -576,7 +576,7 @@ function calc(){
   summary = normal==null ? "" :
     `${label}: set price ${money(finalPx,false)}` + (pct>0?` (${pct}% off ${money(normal,false)}, ${reason||"no reason given"})`:"") + `\n` +
     `Avg market value ${money(avg)} · floor ${floor?money(floor):"none"} · recommended ${money(rec,false)} · LR ${lr!=null?money(lr):"none"}\n` +
-    `Consignor ${money(R.split.consignor)} / store ${money(R.split.cbs)} at ${Math.round(R.consignmentRate*1000)/10}%` +
+    `Consignor ${money(R.split.consignor)} / store ${money(R.split.store)} at ${Math.round(R.consignmentRate*1000)/10}%` +
     (usedPx!=null ? `\nUsed price ${money(usedPx,false)}` : "");
   store.set("bpc.rate", $("rate").value);
 }
@@ -715,9 +715,10 @@ let lookupSeq = 0, lookupTimer = null, lastLooked = "";
 
 // The page opens only after Google sign-in. Both values below are public: the Client ID
 // names this app to Google, and the web app refuses everything without a sign-in.
-const DEFAULT_API_URL = "https://script.google.com/macros/s/AKfycbxhS_Lhqhh6P9EXLg5DDETxxAt6zfS1LwsJ9ThSrUXgLI4HKWfkWm7vh4pO-zN4tt5k/exec";
-const GOOGLE_CLIENT_ID = "797910032478-qf0scmk81i8floch2p5a6fnvo798sm45.apps.googleusercontent.com";
-if(!api.url) api.url = DEFAULT_API_URL;
+const DEFAULT_API_URL = "https://script.google.com/macros/s/AKfycbyjF-O3A2y1jhYslO3JpnUkoyZgah84iUhFxwFSUZYiXQf1zau7gdfMAJLM-JsznMD1/exec";
+const OLD_API_URL = "https://script.google.com/macros/s/AKfycbxhS_Lhqhh6P9EXLg5DDETxxAt6zfS1LwsJ9ThSrUXgLI4HKWfkWm7vh4pO-zN4tt5k/exec";
+const GOOGLE_CLIENT_ID = "173673116616-cgbpp43o38cl6iro5blkqo8novco0004.apps.googleusercontent.com";
+if(!api.url || api.url === OLD_API_URL){ api.url = DEFAULT_API_URL; store.set("bpc.apiUrl", api.url); }
 $("apiUrl").value = api.url;
 
 function apiCall(params){

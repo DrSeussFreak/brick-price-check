@@ -1,7 +1,7 @@
 /*
- * CBS Brick Pricing engine
- * One source of truth for how Central Brick Society prices a consigned LEGO set.
- * Used by Brick Price Check (browser) and by the CBS Consignment Tracker (Google Apps Script).
+ * Brick Checker pricing engine
+ * One source of truth for how DrSeussFreak's Brick Checker prices a LEGO set.
+ * Used by the Brick Checker page and the Consignment Tracker (Google Apps Script).
  *
  *   BrickPricing.priceSet(input) -> result
  *
@@ -13,14 +13,14 @@
  *   lr                            LR Suggested Price (DasBot !price)
  *   stillAtRetail                 true if LEGO still sells the set (LR estimate = retail)
  *   discount                      condition discount: 15, 0.15, "15%", or a key of RULES.conditionDiscounts
- *   consignmentRate               CBS share: 35 or 0.35 (default RULES.consignmentRate)
+ *   consignmentRate               Store share: 35 or 0.35 (default RULES.consignmentRate)
  */
 (function (root) {
   "use strict";
 
   var RULES = {
     version: "1.3.0",
-    consignmentRate: 0.35,          // CBS keeps this share; consignor gets the rest
+    consignmentRate: 0.35,          // the store keeps this share; consignor gets the rest
     memberDiscount: 0.05,           // member / employee discount, split on the discounted price
     shelfRounding: 5,               // LR Suggested Price is rounded to the nearest $5
     averageSources: ["brickset", "bricklink6", "brickeconomy", "brickowl"],
@@ -71,8 +71,8 @@
     return n > 1 ? n / 100 : n;
   }
   function split(price, rate) {
-    if (price === null) return { price: null, consignor: null, cbs: null };
-    return { price: price, consignor: round2(price * (1 - rate)), cbs: round2(price * rate) };
+    if (price === null) return { price: null, consignor: null, store: null };
+    return { price: price, consignor: round2(price * (1 - rate)), store: round2(price * rate) };
   }
 
   function priceSet(input) {

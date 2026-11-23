@@ -18,7 +18,7 @@ Look up any LEGO set, minifigure, part or element by number. Price it new and us
 4. **Normal shelf price**: the LR Suggested Price (DasBot `!price` in Lego_Raffles) rounded to $5, never below the floor. If you don't enter one, the BrickEconomy new value is used (that's what DasBot shows), or retail when BrickEconomy has none.
 5. **Never below retail unless discounted.** Condition discounts: minor dents 5%, major crease 10%, crushed box 15%, box opened with bags sealed 15%.
 6. **Used price**: the average of the used figures, rounded to $1.
-7. **Consignment split**: consignor 65%, CBS 35%. The member/employee 5% is split on the discounted price.
+7. **Consignment split**: consignor 65%, store 35%. The member/employee 5% is split on the discounted price.
 
 Minifigs and parts use the recommended price; parts are priced to the cent.
 
@@ -26,7 +26,7 @@ Minifigs and parts use the recommended price; parts are priced to the cent.
 
 Live lookups run in Google Apps Script, so your API keys stay private and the sites' cross-site limits don't apply.
 
-1. In the CBS Consignment Tracker, open **Extensions > Apps Script**. Delete everything in `Code.gs`, paste in all of [`apps-script/CBS-Pricing-API.gs`](apps-script/CBS-Pricing-API.gs), and save. It must be this tracker's own script: `?set=` and `?all=` read its Pricing tab.
+1. In your Consignment Tracker, open **Extensions > Apps Script**. Delete everything in `Code.gs`, paste in all of [`apps-script/Brick-Checker-API.gs`](apps-script/Brick-Checker-API.gs), and save. It must be this tracker's own script: `?set=` and `?all=` read its Pricing tab.
 2. Under **Project Settings (gear) > Script properties**, add these, spelled exactly as shown. A source without a key is skipped.
 
    | Property | Where to get it |
@@ -91,13 +91,13 @@ All pricing is in [`pricing.js`](pricing.js), shared by the app and the tracker.
     new: { brickset: 107, bricklink6: 113.04, brickeconomy: 140, brickowl: 133.02 },
     used: { bricklink6: 80 }, discount: 15
   });
-  // r.setPrice, r.usedPrice, r.recommendedPrice, r.split.consignor, r.split.cbs ...
+  // r.setPrice, r.usedPrice, r.recommendedPrice, r.split.consignor, r.split.store ...
 </script>
 ```
 
 Rules as JSON: https://drseussfreak.github.io/brick-price-check/api/rules.json
 
-**Sheet formulas** (after step 1): `=CBS_RECOMMENDED(N2,O2,Q2,R2,J2,I2)`, `=CBS_SET_PRICE(E2,N2,O2,Q2,R2,J2,I2,L2)`, `=CBS_USED_PRICE(range)`, `=CBS_SPLIT(D2,"consignor")`.
+**Sheet formulas** (after step 1): `=BRICK_RECOMMENDED(N2,O2,Q2,R2,J2,I2)`, `=BRICK_SET_PRICE(E2,N2,O2,Q2,R2,J2,I2,L2)`, `=BRICK_USED_PRICE(range)`, `=BRICK_SPLIT(D2,"consignor")`.
 
 **Web API** (after step 3; add `&token=` if you set one):
 
